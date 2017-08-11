@@ -1,0 +1,32 @@
+hash: 0feaf6c9546c32f2820026c0b5b6b18071b57dda07be9ec7495c658961f50eb9
+updated: 2017-08-11T16:08:21.027564041-07:00
+imports:
+- name: github.com/Clever/amazon-kinesis-client-go
+  version: 375e4d1147fec89a5078b6586f28a19954d1ef4b
+  subpackages:
+  - batchconsumer
+  - batchconsumer/stats
+  - kcl
+  - splitter
+- name: github.com/xeipuuv/gojsonpointer
+  version: e0fe6f68307607d540ed8eac07a342c33fa1b54a
+- name: github.com/xeipuuv/gojsonreference
+  version: e02fc20de94c78484cd5ffb007f8af96be030a45
+- name: github.com/xeipuuv/gojsonschema
+  version: e18f0065e8c148fcf567ac43a3f8f5b66ac0720b
+- name: golang.org/x/net
+  version: a6577fac2d73be281a500b310739095313165611
+  subpackages:
+  - context
+- name: golang.org/x/time
+  version: f51c12702a4d776e4c1fa9b0fabab841babae631
+  subpackages:
+  - rate
+- name: gopkg.in/Clever/kayvee-go.v6
+  version: 096364e316a52652d3493be702d8105d8d01db84
+  subpackages:
+  - logger
+  - router
+- name: gopkg.in/yaml.v2
+  version: a5b47d31c556af34a302ce5d659e6fea44d90de0
+testImports: []
