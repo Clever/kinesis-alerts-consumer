@@ -6,8 +6,7 @@ import (
 
 var lg = logger.New("kinesis-cwlogs-splitter")
 
-type AlertsConsumer struct {
-}
+type AlertsConsumer struct{}
 
 // ProcessMessage is called once per log to parse the log line and then reformat it
 // so that it can be directly used by the output. The returned tags will be passed along

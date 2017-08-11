@@ -26,7 +26,6 @@ func main() {
 		BatchInterval: time.Second,
 	}
 
-	output := AlertsConsumer{}
-	consumer := kbc.NewBatchConsumer(config, output)
+	consumer := kbc.NewBatchConsumer(config, &AlertsConsumer{})
 	consumer.Start()
 }

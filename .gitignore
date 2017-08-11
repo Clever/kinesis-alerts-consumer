@@ -9,3 +9,4 @@
 
 vendor/
 kinesis-consumer
+kinesis-alerts-consumer
