@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/signalfx/golib/datapoint"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +31,6 @@ func TestProcessMessage(t *testing.T) {
 	expectedPts := []datapoint.Datapoint{
 		datapoint.Datapoint{
 			Metric: "oauth.login_start",
-			// TODO: Figure out why dimensions aren't getting written...
 			Dimensions: map[string]string{
 				"district":    "ddd",
 				"title":       "login_start",
@@ -57,7 +58,7 @@ func TestEncodeMessage(t *testing.T) {
 		"dim_b":     "dim_b_val",
 		"hostname":  "my-hostname",
 		"env":       "my-env",
-		"timestamp": time.Time{}, // TODO
+		"timestamp": time.Time{},
 		"_kvmeta": map[string]interface{}{
 			"routes": []interface{}{
 				map[string]interface{}{
@@ -88,7 +89,7 @@ func TestEncodeMessage(t *testing.T) {
 			},
 			Value:      datapoint.NewIntValue(123),
 			MetricType: datapoint.Counter,
-			Timestamp:  time.Time{}, // TODO
+			Timestamp:  time.Time{},
 		},
 	}
 
@@ -109,7 +110,7 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 		"dim_b":     "dim_b_val",
 		"hostname":  "my-hostname",
 		"env":       "my-env",
-		"timestamp": time.Time{}, // TODO
+		"timestamp": time.Time{},
 		"_kvmeta": map[string]interface{}{
 			"routes": []interface{}{
 				map[string]interface{}{
@@ -140,7 +141,7 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
 			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{}, // TODO
+			Timestamp:  time.Time{},
 		},
 	}
 
@@ -162,7 +163,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 		"dim_b":     "dim_b_val",
 		"hostname":  "my-hostname",
 		"env":       "my-env",
-		"timestamp": time.Time{}, // TODO
+		"timestamp": time.Time{},
 		"_kvmeta": map[string]interface{}{
 			"routes": []interface{}{
 				map[string]interface{}{
@@ -201,7 +202,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
 			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{}, // TODO
+			Timestamp:  time.Time{},
 		},
 		datapoint.Datapoint{
 			Metric: "series-name-2",
@@ -213,7 +214,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
 			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{}, // TODO
+			Timestamp:  time.Time{},
 		},
 	}
 
@@ -249,15 +250,148 @@ func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
 	assert.Contains(t, err.Error(), "intentionally skipped")
 }
 
-// TODO
-// func TestSendBatch(t *testing.T) {
-// 	input1 := []byte(`todo`)
-// 	input2 := []byte(`todo2`)
-// 	batchedInput := [][]byte{input1, input2}
+type MockSink struct {
+	pts []datapoint.Datapoint
+}
 
-// 	consumer := AlertsConsumer{}
+func (s *MockSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
+	for _, p := range points {
+		s.pts = append(s.pts, *p)
+	}
+	return nil
+}
 
-// 	t.Log("verify can SendBatch to 'tag'")
-// 	err := consumer.SendBatch(batchedInput, "tag")
-// 	assert.NoError(t, err)
-// }
+func TestSendBatch(t *testing.T) {
+	pts := []datapoint.Datapoint{
+		datapoint.Datapoint{
+			Metric: "series-name",
+			Dimensions: map[string]string{
+				"dim_a":    "dim_a_val",
+				"dim_b":    "dim_b_val",
+				"hostname": "my-hostname",
+				"env":      "my-env",
+			},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  time.Time{},
+		}, datapoint.Datapoint{
+			Metric: "series-name-2",
+			Dimensions: map[string]string{
+				"dim_a":    "dim_a_val",
+				"dim_b":    "dim_b_val",
+				"hostname": "my-hostname",
+				"env":      "my-env",
+			},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  time.Time{},
+		},
+	}
+	pts2 := []datapoint.Datapoint{
+		datapoint.Datapoint{
+			Metric: "series-name-3",
+			Dimensions: map[string]string{
+				"dim_a":    "dim_a_val",
+				"dim_b":    "dim_b_val",
+				"hostname": "my-hostname",
+				"env":      "my-env",
+			},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  time.Time{},
+		}, datapoint.Datapoint{
+			Metric:     "series-name-4",
+			Dimensions: map[string]string{"dim_a": "dim_a_val"},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  time.Time{},
+		},
+	}
+
+	b, err := json.Marshal(pts)
+	assert.NoError(t, err)
+	input := [][]byte{b}
+
+	b2, err := json.Marshal(pts2)
+	assert.NoError(t, err)
+	input2 := [][]byte{b2}
+
+	mockSink := &MockSink{}
+	consumer := AlertsConsumer{
+		sfxSink: mockSink,
+	}
+	t.Log("Send first batch")
+	err = consumer.SendBatch(input, "default")
+	assert.NoError(t, err)
+	assert.Equal(t, append(pts), mockSink.pts)
+
+	t.Log("Send second batch")
+	err = consumer.SendBatch(input2, "default")
+	assert.NoError(t, err)
+	assert.Equal(t, append(pts, pts2...), mockSink.pts)
+}
+
+func TestSendBatchWithMultipleEntries(t *testing.T) {
+	pts := []datapoint.Datapoint{
+		datapoint.Datapoint{
+			Metric: "series-name",
+			Dimensions: map[string]string{
+				"dim_a":    "dim_a_val",
+				"dim_b":    "dim_b_val",
+				"hostname": "my-hostname",
+				"env":      "my-env",
+			},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  time.Time{},
+		}, datapoint.Datapoint{
+			Metric: "series-name-2",
+			Dimensions: map[string]string{
+				"dim_a":    "dim_a_val",
+				"dim_b":    "dim_b_val",
+				"hostname": "my-hostname",
+				"env":      "my-env",
+			},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  time.Time{},
+		},
+	}
+	pts2 := []datapoint.Datapoint{
+		datapoint.Datapoint{
+			Metric: "series-name-3",
+			Dimensions: map[string]string{
+				"dim_a":    "dim_a_val",
+				"dim_b":    "dim_b_val",
+				"hostname": "my-hostname",
+				"env":      "my-env",
+			},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  time.Time{},
+		}, datapoint.Datapoint{
+			Metric:     "series-name-4",
+			Dimensions: map[string]string{"dim_a": "dim_a_val"},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  time.Time{},
+		},
+	}
+
+	b, err := json.Marshal(pts)
+	assert.NoError(t, err)
+
+	b2, err := json.Marshal(pts2)
+	assert.NoError(t, err)
+
+	input := [][]byte{b, b2}
+
+	mockSink := &MockSink{}
+	consumer := AlertsConsumer{
+		sfxSink: mockSink,
+	}
+	t.Log("Send batch with multiple entries")
+	err = consumer.SendBatch(input, "default")
+	assert.NoError(t, err)
+	assert.Equal(t, append(pts, pts2...), mockSink.pts)
+}

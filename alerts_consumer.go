@@ -19,6 +19,7 @@ var sfxSink *sfxclient.HTTPSink
 
 var defaultDimensions = []string{"hostname", "env"}
 
+// AlertsConsumer sends datapoints to SignalFX
 type AlertsConsumer struct {
 	sfxSink      sfxclient.Sink
 	deployEnv    string
@@ -100,23 +101,24 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	pts := []datapoint.Datapoint{}
 	for _, b := range batch {
-		partialPts := []datapoint.Datapoint{}
-		err := json.Unmarshal(b, &pts)
+		batchPts := []datapoint.Datapoint{}
+		err := json.Unmarshal(b, &batchPts)
 		if err != nil {
 			return err
 		}
 
-		pts = append(pts, partialPts...)
+		pts = append(pts, batchPts...)
 	}
 
 	ptRefs := []*datapoint.Datapoint{}
-	for _, pt := range pts {
-		ptRefs = append(ptRefs, &pt)
+	for idx := range pts {
+		ptRefs = append(ptRefs, &pts[idx])
 	}
 
 	return c.sfxSink.AddDatapoints(context.TODO(), ptRefs)
 }
 
-func (s *AlertsConsumer) globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
+func (c *AlertsConsumer) globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
+	// TODO: Not yet supported
 	return []decode.AlertRoute{}
 }
