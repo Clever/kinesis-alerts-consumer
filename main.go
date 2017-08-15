@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/signalfx/golib/sfxclient"
+
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
 )
 
@@ -26,6 +28,13 @@ func main() {
 		BatchInterval: time.Second,
 	}
 
-	consumer := kbc.NewBatchConsumer(config, &AlertsConsumer{})
+	sfxSink := sfxclient.NewHTTPSink()
+	sfxSink.AuthToken = getEnv("SFX_API_TOKEN")
+	ac := &AlertsConsumer{
+		sfxSink:      sfxSink,
+		deployEnv:    "todo",      // TODO
+		minTimestamp: time.Time{}, // TODO
+	}
+	consumer := kbc.NewBatchConsumer(config, ac)
 	consumer.Start()
 }

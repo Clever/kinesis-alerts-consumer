@@ -6,3 +6,7 @@ import:
 - package: gopkg.in/Clever/kayvee-go.v6
   subpackages:
   - logger
+- package: github.com/signalfx/golib
+- package: github.com/Clever/syslogparser
+  subpackages:
+  - rfc3164

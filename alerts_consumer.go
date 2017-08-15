@@ -1,21 +1,122 @@
 package main
 
 import (
-	"gopkg.in/Clever/kayvee-go.v6/logger"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/sfxclient"
+	"golang.org/x/net/context"
+
+	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
+	"github.com/Clever/amazon-kinesis-client-go/decode"
+	"github.com/Clever/kayvee-go/logger"
 )
 
-var lg = logger.New("kinesis-cwlogs-splitter")
+var lg = logger.New("kinesis-alerts-consumer")
+var sfxSink *sfxclient.HTTPSink
 
-type AlertsConsumer struct{}
+var defaultDimensions = []string{"hostname", "env"}
+
+type AlertsConsumer struct {
+	sfxSink      sfxclient.Sink
+	deployEnv    string
+	minTimestamp time.Time
+}
 
 // ProcessMessage is called once per log to parse the log line and then reformat it
 // so that it can be directly used by the output. The returned tags will be passed along
 // with the encoded log to SendBatch()
 func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []string, err error) {
-	return rawmsg, []string{"default"}, nil
+	// Parse the log line
+	fields, err := decode.ParseAndEnhance(string(rawmsg), c.deployEnv, false, false, c.minTimestamp)
+	if err != nil {
+		return nil, []string{}, err
+	}
+
+	return c.encodeMessage(fields)
+}
+
+func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, []string, error) {
+	// Determine routes
+	kvmeta := decode.ExtractKVMeta(fields)
+	routes := kvmeta.Routes.AlertRoutes()
+	routes = append(routes, c.globalRoutes(fields)...)
+	if len(routes) <= 0 {
+		return nil, nil, kbc.ErrMessageIgnored
+	}
+
+	// Create datapoints to send to SFX
+	points := []datapoint.Datapoint{}
+	for _, route := range routes {
+		// Look up dimensions (custom + default)
+		dims := map[string]string{}
+		for _, dim := range append(route.Dimensions, defaultDimensions...) {
+			dimVal, ok := fields[dim].(string)
+			if ok {
+				dims[dim] = dimVal
+			}
+		}
+
+		timestamp, ok := fields["timestamp"].(time.Time)
+		if !ok {
+			return []byte{}, []string{}, fmt.Errorf("unable parse Time from message's 'timestamp' field")
+		}
+
+		// Create datapoint
+		var pt *datapoint.Datapoint
+		if route.StatType == "counter" {
+			counterVal := int64(1)
+			val, ok := fields[route.ValueField].(float64)
+			if ok {
+				counterVal = int64(val)
+			}
+			pt = datapoint.New(route.Series, dims, datapoint.NewIntValue(counterVal), datapoint.Counter, timestamp)
+		} else if route.StatType == "gauge" {
+			gaugeVal := float64(0)
+			val, ok := fields[route.ValueField].(float64)
+			if ok {
+				gaugeVal = val
+			}
+			pt = datapoint.New(route.Series, dims, datapoint.NewFloatValue(gaugeVal), datapoint.Gauge, timestamp)
+		} else {
+			return []byte{}, []string{}, fmt.Errorf("invalid StatType in route: %s", route.StatType)
+		}
+
+		points = append(points, *pt)
+	}
+
+	// May return more than one SFX datapoint
+	out, err := json.Marshal(points)
+	if err != nil {
+		return []byte{}, []string{}, err
+	}
+
+	return out, []string{"default"}, nil
 }
 
 // SendBatch is called once per batch per tag
 func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
-	return nil
+	pts := []datapoint.Datapoint{}
+	for _, b := range batch {
+		partialPts := []datapoint.Datapoint{}
+		err := json.Unmarshal(b, &pts)
+		if err != nil {
+			return err
+		}
+
+		pts = append(pts, partialPts...)
+	}
+
+	ptRefs := []*datapoint.Datapoint{}
+	for _, pt := range pts {
+		ptRefs = append(ptRefs, &pt)
+	}
+
+	return c.sfxSink.AddDatapoints(context.TODO(), ptRefs)
+}
+
+func (s *AlertsConsumer) globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
+	return []decode.AlertRoute{}
 }
