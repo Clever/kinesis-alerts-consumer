@@ -117,10 +117,21 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	ptRefs := []*datapoint.Datapoint{}
 	for idx := range pts {
 		updateMaxDelay(pts[idx].Timestamp)
+
+		// For fairly recent logs, let SignalFX assign a timestamp on arrival,
+		// instead of the log's actual timestamp.  This ensures datapoints are sent
+		// in-order per timeseries. (If out of order, SignalFX will drop them
+		// silently.)
+		//
+		// For older logs, use their actual timestamp. This may result in some
+		// dropped logs, but should be less important since we care mainly about
+		// accurate alerting on recent data.
+		if isRecent(pts[idx].Timestamp, 30*time.Second) {
+			pts[idx].Timestamp = time.Time{}
+		}
 		ptRefs = append(ptRefs, &pts[idx])
 	}
 
-	// TODO: Ensure datapoints are set in-order (by timestamp) per timeseries, else SignalFX will drop them
 	return c.sfxSink.AddDatapoints(context.TODO(), ptRefs)
 }
 

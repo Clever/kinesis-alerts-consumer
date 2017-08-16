@@ -22,6 +22,20 @@ func updateMaxDelay(t time.Time) {
 	}
 }
 
+func isRecent(t time.Time, allowedDelay time.Duration) bool {
+	if (t == time.Time{}) {
+		return false
+	}
+
+	// how long ago is the log from?
+	lag := time.Now().Sub(t)
+	if lag > allowedDelay {
+		return false
+	}
+
+	return false
+}
+
 func logMaxDelayThenReset() {
 	maxDelayLock.Lock()
 	defer maxDelayLock.Unlock()
