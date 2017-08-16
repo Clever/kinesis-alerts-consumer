@@ -31,8 +31,9 @@ func getIntEnv(key string) int {
 
 func main() {
 	config := kbc.Config{
-		LogFile:    "/tmp/kinesis-consumer-" + time.Now().Format(time.RFC3339),
-		BatchCount: 1, // call SendBatch immediately; batching is handled by sfxclient HTTP Sink
+		LogFile:       "/tmp/kinesis-consumer-" + time.Now().Format(time.RFC3339),
+		BatchCount:    100,
+		BatchInterval: time.Second * 5,
 	}
 
 	sfxSink := sfxclient.NewHTTPSink()
