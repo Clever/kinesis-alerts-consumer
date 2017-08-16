@@ -37,7 +37,7 @@ func main() {
 
 	sfxSink := sfxclient.NewHTTPSink()
 	sfxSink.AuthToken = getEnv("SFX_API_TOKEN")
-	minTimestamp := getIntEnv("MIN_TIMESTAMP")
+	minTimestamp := getIntEnv("MINIMUM_TIMESTAMP")
 	ac := &AlertsConsumer{
 		sfxSink:      sfxSink,
 		deployEnv:    getEnv("DEPLOY_ENV"),

@@ -118,7 +118,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	return c.sfxSink.AddDatapoints(context.TODO(), ptRefs)
 }
 
-func (c *AlertsConsumer) globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
+func (s *AlertsConsumer) globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	// TODO: Not yet supported
 	return []decode.AlertRoute{}
 }
