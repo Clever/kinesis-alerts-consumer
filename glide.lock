@@ -1,5 +1,5 @@
-hash: 1dda80919381776b0d9b1ad6629ddece54d9bc7f9b92a399050a9a31563bdb0b
-updated: 2017-08-15T12:14:51.214226188-07:00
+hash: 8cf8fc1ce9be676846593d3dbfb104fb6bd8e9a938e399ace003911d2a22e1b7
+updated: 2017-08-15T17:09:03.717898494-07:00
 imports:
 - name: github.com/Clever/amazon-kinesis-client-go
   version: 035cc7fd8397787308a2589cc07edadfaae979a1
@@ -66,11 +66,11 @@ imports:
   version: eb3733d160e74a9c7e442f435eb3bea458e1d19f
 testImports:
 - name: github.com/davecgh/go-spew
-  version: adab96458c51a58dc1783b3335dcce5461522e75
+  version: 6d212800a42e8ab5c146b8ace3490ee17e5225f9
   subpackages:
   - spew
 - name: github.com/pmezard/go-difflib
-  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  version: d8ed2627bdf02c080bf22230dbb337003b7aba2d
   subpackages:
   - difflib
 - name: github.com/stretchr/testify

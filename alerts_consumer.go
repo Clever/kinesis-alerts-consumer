@@ -20,6 +20,7 @@ var sfxSink *sfxclient.HTTPSink
 var defaultDimensions = []string{"hostname", "env"}
 
 // AlertsConsumer sends datapoints to SignalFX
+// It implements the kbc.Sender interface
 type AlertsConsumer struct {
 	sfxSink      sfxclient.Sink
 	deployEnv    string
@@ -48,6 +49,14 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 		return nil, nil, kbc.ErrMessageIgnored
 	}
 
+	timestamp, ok := fields["timestamp"].(time.Time)
+	if !ok {
+		return []byte{}, []string{}, fmt.Errorf("unable parse Time from message's 'timestamp' field")
+	}
+	if timestamp.Before(c.minTimestamp) {
+		return []byte{}, []string{}, kbc.ErrMessageIgnored
+	}
+
 	// Create datapoints to send to SFX
 	points := []datapoint.Datapoint{}
 	for _, route := range routes {
@@ -58,11 +67,6 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			if ok {
 				dims[dim] = dimVal
 			}
-		}
-
-		timestamp, ok := fields["timestamp"].(time.Time)
-		if !ok {
-			return []byte{}, []string{}, fmt.Errorf("unable parse Time from message's 'timestamp' field")
 		}
 
 		// Create datapoint
@@ -115,6 +119,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 		ptRefs = append(ptRefs, &pts[idx])
 	}
 
+	// TODO: Ensure datapoints are set in-order (by timestamp) per timeseries, else SignalFX will drop them
 	return c.sfxSink.AddDatapoints(context.TODO(), ptRefs)
 }
 
