@@ -116,6 +116,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 
 	ptRefs := []*datapoint.Datapoint{}
 	for idx := range pts {
+		updateMaxDelay(pts[idx].Timestamp)
 		ptRefs = append(ptRefs, &pts[idx])
 	}
 

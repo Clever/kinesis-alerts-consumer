@@ -43,6 +43,15 @@ func main() {
 		deployEnv:    getEnv("DEPLOY_ENV"),
 		minTimestamp: time.Unix(int64(minTimestamp), 0),
 	}
+
+	// Track Max Delay
+	go func() {
+		c := time.Tick(15 * time.Second)
+		for _ = range c {
+			logMaxDelayThenReset()
+		}
+	}()
+
 	consumer := kbc.NewBatchConsumer(config, ac)
 	consumer.Start()
 }
