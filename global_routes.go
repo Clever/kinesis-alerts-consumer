@@ -16,7 +16,7 @@ func globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
 
 	// chain and append all global routes here
 	// TODO: After initial migration, revisit these routes and ensure they all
-	// emit hostname+env via default dimensions
+	// emit hostname+env via default dimensions, outside of global routing
 	routes = append(routes, processMetricsRoutes(fields)...)
 	routes = append(routes, rsyslogRateLimitRoutes(fields)...)
 	routes = append(routes, gearmanRoutes(fields)...)
@@ -120,7 +120,8 @@ func gearmanRoutes(fields map[string]interface{}) []decode.AlertRoute {
 
 	return []decode.AlertRoute{
 		decode.AlertRoute{
-			Series:     fmt.Sprintf("gearman.%s", title),
+			Series: fmt.Sprintf("gearman.%s", title),
+			// TODO: Add hostname + env, and remove filter on env == production
 			Dimensions: []string{"hostname", "function"},
 			StatType:   statTypeCounter,
 			ValueField: defaultValueField,
@@ -157,7 +158,8 @@ func gearcmdPassfailRoutes(fields map[string]interface{}) []decode.AlertRoute {
 
 	return []decode.AlertRoute{
 		decode.AlertRoute{
-			Series:     "gearcmd.passfail",
+			Series: "gearcmd.passfail",
+			// TODO: Add hostname + env, and remove filter on env == production
 			Dimensions: []string{"hostname", "function"},
 			StatType:   statTypeGauge,
 			ValueField: defaultValueField,
@@ -241,7 +243,8 @@ func wagCircuitBreakerRoutes(fields map[string]interface{}) []decode.AlertRoute 
 
 	return []decode.AlertRoute{
 		decode.AlertRoute{
-			Series:     "wag.client-circuit-breakers",
+			Series: "wag.client-circuit-breakers",
+			// TODO: Add hostname + env via default dimensions
 			Dimensions: []string{"container_env", "container_app", "title"},
 			StatType:   statTypeGauge,
 			ValueField: "errorPercentage",
