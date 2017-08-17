@@ -1,0 +1,13 @@
+# osx / sshfs
+._*
+.DS_Store
+
+# emacs / vim
+*~
+\#*\#
+.\#*
+
+vendor/
+kinesis-consumer
+kinesis-alerts-consumer
+jars

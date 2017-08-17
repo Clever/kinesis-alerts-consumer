@@ -1,0 +1,9 @@
+package: github.com/Clever/kinesis-alerts-consumer
+import:
+- package: github.com/Clever/amazon-kinesis-client-go
+  subpackages:
+  - batchconsumer
+- package: gopkg.in/Clever/kayvee-go.v6
+  subpackages:
+  - logger
+- package: github.com/signalfx/golib
