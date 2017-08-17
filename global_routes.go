@@ -15,10 +15,13 @@ func globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	routes := []decode.AlertRoute{}
 
 	// chain and append all global routes here
+	// TODO: After initial migration, revisit these routes and ensure they all
+	// emit hostname+env via default dimensions
 	routes = append(routes, processMetricsRoutes(fields)...)
 	routes = append(routes, rsyslogRateLimitRoutes(fields)...)
 	routes = append(routes, gearmanRoutes(fields)...)
 	routes = append(routes, gearcmdPassfailRoutes(fields)...)
+	routes = append(routes, gearcmdDurationRoutes(fields)...)
 	routes = append(routes, gearcmdHeartbeatRoutes(fields)...)
 	routes = append(routes, wagCircuitBreakerRoutes(fields)...)
 
@@ -51,7 +54,7 @@ func processMetricsRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     fmt.Sprintf("process-metrics.%s", title),
-			Dimensions: []string{"source"},
+			Dimensions: []string{"hostname", "env", "source"},
 			StatType:   statType,
 			ValueField: defaultValueField,
 			RuleName:   "global-process-metrics",
@@ -81,7 +84,7 @@ func rsyslogRateLimitRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     "rsyslog.rate-limit-triggered",
-			Dimensions: []string{},
+			Dimensions: []string{"hostname", "env"},
 			StatType:   statTypeCounter,
 			ValueField: defaultValueField,
 			RuleName:   "global-rsyslog-rate-limit",
@@ -107,10 +110,18 @@ func gearmanRoutes(fields map[string]interface{}) []decode.AlertRoute {
 		return []decode.AlertRoute{}
 	}
 
+	env, ok := fields["env"].(string)
+	if !ok {
+		return []decode.AlertRoute{}
+	}
+	if env != "production" {
+		return []decode.AlertRoute{}
+	}
+
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     fmt.Sprintf("gearman.%s", title),
-			Dimensions: []string{"function"},
+			Dimensions: []string{"hostname", "function"},
 			StatType:   statTypeCounter,
 			ValueField: defaultValueField,
 			RuleName:   "global-gearman",
@@ -136,13 +147,50 @@ func gearcmdPassfailRoutes(fields map[string]interface{}) []decode.AlertRoute {
 		return []decode.AlertRoute{}
 	}
 
+	env, ok := fields["env"].(string)
+	if !ok {
+		return []decode.AlertRoute{}
+	}
+	if env != "production" {
+		return []decode.AlertRoute{}
+	}
+
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     "gearcmd.passfail",
-			Dimensions: []string{"function"},
+			Dimensions: []string{"hostname", "function"},
 			StatType:   statTypeGauge,
 			ValueField: defaultValueField,
 			RuleName:   "global-gearcmd-passfail",
+		},
+	}
+}
+
+// Track duration for Gearcmd based workers
+func gearcmdDurationRoutes(fields map[string]interface{}) []decode.AlertRoute {
+	source, ok := fields["source"].(string)
+	if !ok {
+		return []decode.AlertRoute{}
+	}
+	if source != "gearcmd" {
+		return []decode.AlertRoute{}
+	}
+
+	title, ok := fields["title"].(string)
+	if !ok {
+		return []decode.AlertRoute{}
+	}
+	if title != "duration" {
+		return []decode.AlertRoute{}
+	}
+
+	return []decode.AlertRoute{
+		decode.AlertRoute{
+			Series:     "gearcmd.duration",
+			Dimensions: []string{"hostname", "function", "env"},
+			StatType:   statTypeGauge,
+			ValueField: defaultValueField,
+			RuleName:   "global-gearcmd-duration",
 		},
 	}
 }
@@ -168,7 +216,7 @@ func gearcmdHeartbeatRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     "gearcmd.heartbeat",
-			Dimensions: []string{"function", "job_id", "try_number", "unit"},
+			Dimensions: []string{"hostname", "env", "function", "job_id", "try_number", "unit"},
 			StatType:   statTypeGauge,
 			ValueField: defaultValueField,
 			RuleName:   "global-gearcmd-heartbeat",

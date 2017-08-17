@@ -26,7 +26,7 @@ func TestProcessMetricsRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "process-metrics.some-title",
 		StatType:   statTypeCounter,
-		Dimensions: []string{"source"},
+		Dimensions: []string{"hostname", "env", "source"},
 		ValueField: defaultValueField,
 		RuleName:   "global-process-metrics",
 	}
@@ -45,7 +45,7 @@ func TestProcessMetricsRoutes(t *testing.T) {
 	expected = decode.AlertRoute{
 		Series:     "process-metrics.some-title-2",
 		StatType:   statTypeGauge,
-		Dimensions: []string{"source"},
+		Dimensions: []string{"hostname", "env", "source"},
 		ValueField: defaultValueField,
 		RuleName:   "global-process-metrics",
 	}
@@ -68,7 +68,7 @@ func TestRsyslogRateLimitRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "rsyslog.rate-limit-triggered",
 		StatType:   statTypeCounter,
-		Dimensions: []string{},
+		Dimensions: []string{"hostname", "env"},
 		ValueField: defaultValueField,
 		RuleName:   "global-rsyslog-rate-limit",
 	}
@@ -85,13 +85,14 @@ func TestGearmanRoutes(t *testing.T) {
 	fields = map[string]interface{}{
 		"source": "gearman",
 		"title":  "success",
+		"env":    "production",
 	}
 	routes = gearmanRoutes(fields)
 	assert.Equal(t, 1, len(routes))
 	expected := decode.AlertRoute{
 		Series:     "gearman.success",
 		StatType:   statTypeCounter,
-		Dimensions: []string{"function"},
+		Dimensions: []string{"hostname", "function"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearman",
 	}
@@ -101,17 +102,27 @@ func TestGearmanRoutes(t *testing.T) {
 	fields = map[string]interface{}{
 		"source": "gearman",
 		"title":  "failure",
+		"env":    "production",
 	}
 	routes = gearmanRoutes(fields)
 	assert.Equal(t, 1, len(routes))
 	expected = decode.AlertRoute{
 		Series:     "gearman.failure",
 		StatType:   statTypeCounter,
-		Dimensions: []string{"function"},
+		Dimensions: []string{"hostname", "function"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearman",
 	}
 	assert.Equal(t, expected, routes[0])
+
+	t.Log("Routes a log only if env==production")
+	fields = map[string]interface{}{
+		"source": "gearman",
+		"title":  "success",
+		"env":    "dev",
+	}
+	routes = gearmanRoutes(fields)
+	assert.Equal(t, 0, len(routes))
 }
 
 func TestGearcmdPassfailRoutes(t *testing.T) {
@@ -124,15 +135,48 @@ func TestGearcmdPassfailRoutes(t *testing.T) {
 	fields = map[string]interface{}{
 		"source": "gearcmd",
 		"title":  "END",
+		"env":    "production",
 	}
 	routes = gearcmdPassfailRoutes(fields)
 	assert.Equal(t, 1, len(routes))
 	expected := decode.AlertRoute{
 		Series:     "gearcmd.passfail",
 		StatType:   statTypeGauge,
-		Dimensions: []string{"function"},
+		Dimensions: []string{"hostname", "function"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearcmd-passfail",
+	}
+	assert.Equal(t, expected, routes[0])
+
+	t.Log("Routes a log only if env==production")
+	fields = map[string]interface{}{
+		"source": "gearcmd",
+		"title":  "END",
+		"env":    "dev",
+	}
+	routes = gearcmdPassfailRoutes(fields)
+	assert.Equal(t, 0, len(routes))
+}
+
+func TestGearcmdDurationRoutes(t *testing.T) {
+	t.Log("Base case: doesn't route empty log")
+	fields := map[string]interface{}{}
+	routes := gearcmdDurationRoutes(fields)
+	assert.Equal(t, 0, len(routes))
+
+	t.Log("Routes a log - gearcmd duration")
+	fields = map[string]interface{}{
+		"source": "gearcmd",
+		"title":  "duration",
+	}
+	routes = gearcmdDurationRoutes(fields)
+	assert.Equal(t, 1, len(routes))
+	expected := decode.AlertRoute{
+		Series:     "gearcmd.duration",
+		StatType:   statTypeGauge,
+		Dimensions: []string{"hostname", "function", "env"},
+		ValueField: defaultValueField,
+		RuleName:   "global-gearcmd-duration",
 	}
 	assert.Equal(t, expected, routes[0])
 }
@@ -153,7 +197,7 @@ func TestGearcmdHeartbeatRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "gearcmd.heartbeat",
 		StatType:   statTypeGauge,
-		Dimensions: []string{"function", "job_id", "try_number", "unit"},
+		Dimensions: []string{"hostname", "env", "function", "job_id", "try_number", "unit"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearcmd-heartbeat",
 	}

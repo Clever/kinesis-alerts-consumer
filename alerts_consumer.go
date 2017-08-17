@@ -42,9 +42,16 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 
 func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, []string, error) {
 	// Determine routes
+	// KVMeta Routes
 	kvmeta := decode.ExtractKVMeta(fields)
 	routes := kvmeta.Routes.AlertRoutes()
+	for idx := range routes {
+		routes[idx].Dimensions = append(routes[idx].Dimensions, defaultDimensions...)
+	}
+
+	// Global Routes
 	routes = append(routes, globalRoutes(fields)...)
+
 	if len(routes) <= 0 {
 		return nil, nil, kbc.ErrMessageIgnored
 	}
@@ -62,7 +69,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	for _, route := range routes {
 		// Look up dimensions (custom + default)
 		dims := map[string]string{}
-		for _, dim := range append(route.Dimensions, defaultDimensions...) {
+		for _, dim := range route.Dimensions {
 			dimVal, ok := fields[dim].(string)
 			if ok {
 				dims[dim] = dimVal
