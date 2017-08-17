@@ -395,3 +395,50 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, append(pts, pts2...), mockSink.pts)
 }
+
+func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
+	now := time.Now().UTC()
+	oneMinuteAgo := now.Add(-1 * time.Minute)
+
+	pts := []datapoint.Datapoint{
+		datapoint.Datapoint{
+			Metric: "series-name",
+			Dimensions: map[string]string{
+				"dim_a":    "dim_a_val",
+				"dim_b":    "dim_b_val",
+				"hostname": "my-hostname",
+				"env":      "my-env",
+			},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  now, // This should be reset to time.Time{}
+		}, datapoint.Datapoint{
+			Metric: "series-name-2",
+			Dimensions: map[string]string{
+				"dim_a":    "dim_a_val",
+				"dim_b":    "dim_b_val",
+				"hostname": "my-hostname",
+				"env":      "my-env",
+			},
+			Value:      datapoint.NewFloatValue(float64(9.5)),
+			MetricType: datapoint.Gauge,
+			Timestamp:  oneMinuteAgo, // This time should not be modified
+		},
+	}
+
+	b, err := json.Marshal(pts)
+	assert.NoError(t, err)
+	input := [][]byte{b}
+
+	mockSink := &MockSink{}
+	consumer := AlertsConsumer{
+		sfxSink: mockSink,
+	}
+	t.Log("Send first batch")
+	err = consumer.SendBatch(input, "default")
+	assert.NoError(t, err)
+
+	t.Log("Datapoints with recent timestamps should ignore their timestamp and instead get a timestamp on arrival to SignalFX")
+	pts[0].Timestamp = time.Time{}
+	assert.Equal(t, pts, mockSink.pts)
+}

@@ -29,8 +29,8 @@ func isRecent(t time.Time, allowedDelay time.Duration) bool {
 
 	// how long ago is the log from?
 	lag := time.Now().Sub(t)
-	if lag > allowedDelay {
-		return false
+	if lag <= allowedDelay {
+		return true
 	}
 
 	return false
