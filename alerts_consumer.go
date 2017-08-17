@@ -44,7 +44,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	// Determine routes
 	kvmeta := decode.ExtractKVMeta(fields)
 	routes := kvmeta.Routes.AlertRoutes()
-	routes = append(routes, c.globalRoutes(fields)...)
+	routes = append(routes, globalRoutes(fields)...)
 	if len(routes) <= 0 {
 		return nil, nil, kbc.ErrMessageIgnored
 	}
@@ -133,9 +133,4 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	}
 
 	return c.sfxSink.AddDatapoints(context.TODO(), ptRefs)
-}
-
-func (s *AlertsConsumer) globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
-	// TODO: Not yet supported
-	return []decode.AlertRoute{}
 }
