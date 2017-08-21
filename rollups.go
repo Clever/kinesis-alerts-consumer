@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/signalfx/golib/sfxclient"
 )
@@ -18,18 +20,22 @@ type Rollups struct {
 func NewRollups(sfxSink sfxclient.Sink) *Rollups {
 	scheduler := sfxclient.NewScheduler()
 	scheduler.Sink = sfxSink
+	scheduler.SendZeroTime = true
 	scheduler.ErrorHandler = func(err error) error {
 		lg.ErrorD("rollup-error", map[string]interface{}{"error": err.Error()})
 		return nil
 	}
-	go scheduler.Schedule(context.Background())
-
 	return &Rollups{
 		sfxSink:                            sfxSink,
 		scheduler:                          scheduler,
 		rollupsRequestFinishedResponseTime: map[string]*sfxclient.RollingBucket{},
 		rollupsRequestFinishedStatusCode:   map[string]*sfxclient.CumulativeBucket{},
 	}
+}
+
+// Run this in a goroutine.
+func (r *Rollups) Run(ctx context.Context) error {
+	return r.scheduler.Schedule(ctx)
 }
 
 func (r *Rollups) Process(fields map[string]interface{}) error {
@@ -79,16 +85,18 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 	return nil
 }
 
+// join map values together in sorted key order
 func join(m map[string]string, sep string) string {
-	var s string
-	first := true
-	for _, v := range m {
-		if !first {
-			s += sep
-		} else {
-			first = true
-		}
-		s += v
+	keys := []string{}
+	for k := range m {
+		keys = append(keys, k)
 	}
-	return s
+	sort.Sort(sort.StringSlice(keys))
+
+	vals := []string{}
+	for _, k := range keys {
+		vals = append(vals, m[k])
+	}
+
+	return strings.Join(vals, sep)
 }

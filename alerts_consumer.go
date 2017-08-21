@@ -30,11 +30,13 @@ type AlertsConsumer struct {
 }
 
 func NewAlertsConsumer(sfxSink sfxclient.Sink, deployEnv string, minTimestamp time.Time) *AlertsConsumer {
+	rollups := NewRollups(sfxSink)
+	go rollups.Run(context.Background())
 	return &AlertsConsumer{
 		sfxSink:      sfxSink,
 		deployEnv:    deployEnv,
 		minTimestamp: minTimestamp,
-		rollups:      NewRollups(sfxSink),
+		rollups:      rollups,
 	}
 }
 
