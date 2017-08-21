@@ -18,7 +18,10 @@ type Rollups struct {
 func NewRollups(sfxSink sfxclient.Sink) *Rollups {
 	scheduler := sfxclient.NewScheduler()
 	scheduler.Sink = sfxSink
-	// TODO: scheduler.ErrorHandler = ...
+	scheduler.ErrorHandler = func(err error) error {
+		lg.ErrorD("rollup-error", map[string]interface{}{"error": err.Error()})
+		return nil
+	}
 	go scheduler.Schedule(context.Background())
 
 	return &Rollups{
@@ -42,7 +45,7 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 			dimensionsKey := join(dimensions, "-")
 			bucket, ok := r.rollupsRequestFinishedResponseTime[dimensionsKey]
 			if !ok {
-				lg.InfoD("rollup-create", mapStringInterface(dimensions))
+				lg.InfoD("rollup-create", map[string]interface{}{"key": dimensionsKey})
 				bucket = sfxclient.NewRollingBucket("request-finished-response-time", dimensions)
 				r.rollupsRequestFinishedResponseTime[dimensionsKey] = bucket
 				r.scheduler.AddCallback(bucket)
@@ -61,7 +64,7 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 			dimensionsKey := join(dimensions, "-")
 			bucket, ok := r.rollupsRequestFinishedStatusCode[dimensionsKey]
 			if !ok {
-				lg.InfoD("rollup-create", mapStringInterface(dimensions))
+				lg.InfoD("rollup-create", map[string]interface{}{"key": dimensionsKey})
 				bucket = &sfxclient.CumulativeBucket{
 					MetricName: "request-finished-status-code",
 					Dimensions: dimensions,
@@ -74,14 +77,6 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 	}
 
 	return nil
-}
-
-func mapStringInterface(m map[string]string) map[string]interface{} {
-	newM := map[string]interface{}{}
-	for k, v := range m {
-		newM[k] = v
-	}
-	return newM
 }
 
 func join(m map[string]string, sep string) string {
