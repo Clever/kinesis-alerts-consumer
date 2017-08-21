@@ -35,7 +35,7 @@ func TestProcessMessage(t *testing.T) {
 				"district":    "ddd",
 				"title":       "login_start",
 				"auth_method": "auth",
-				"hostname":    "my-hostname",
+				"Hostname":    "my-hostname",
 				"env":         "test-env",
 			},
 			Value:      datapoint.NewIntValue(1),
@@ -56,7 +56,7 @@ func TestEncodeMessage(t *testing.T) {
 		"value":     float64(123),
 		"dim_a":     "dim_a_val",
 		"dim_b":     "dim_b_val",
-		"hostname":  "my-hostname",
+		"Hostname":  "my-hostname",
 		"env":       "my-env",
 		"timestamp": time.Time{},
 		"_kvmeta": map[string]interface{}{
@@ -84,7 +84,7 @@ func TestEncodeMessage(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewIntValue(123),
@@ -108,7 +108,7 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 		"value":     float64(9.5),
 		"dim_a":     "dim_a_val",
 		"dim_b":     "dim_b_val",
-		"hostname":  "my-hostname",
+		"Hostname":  "my-hostname",
 		"env":       "my-env",
 		"timestamp": time.Time{},
 		"_kvmeta": map[string]interface{}{
@@ -136,7 +136,7 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -161,7 +161,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 		"value":     float64(9.5),
 		"dim_a":     "dim_a_val",
 		"dim_b":     "dim_b_val",
-		"hostname":  "my-hostname",
+		"Hostname":  "my-hostname",
 		"env":       "my-env",
 		"timestamp": time.Time{},
 		"_kvmeta": map[string]interface{}{
@@ -197,7 +197,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -209,7 +209,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -268,7 +268,7 @@ func TestSendBatch(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -279,7 +279,7 @@ func TestSendBatch(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -293,7 +293,7 @@ func TestSendBatch(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -338,7 +338,7 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -349,7 +349,7 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -363,7 +363,7 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -406,7 +406,7 @@ func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -417,7 +417,7 @@ func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
 				"dim_b":    "dim_b_val",
-				"hostname": "my-hostname",
+				"Hostname": "my-hostname",
 				"env":      "my-env",
 			},
 			Value:      datapoint.NewFloatValue(float64(9.5)),

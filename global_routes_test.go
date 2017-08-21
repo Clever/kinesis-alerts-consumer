@@ -26,7 +26,7 @@ func TestProcessMetricsRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "process-metrics.some-title",
 		StatType:   statTypeCounter,
-		Dimensions: []string{"hostname", "env", "source"},
+		Dimensions: []string{"Hostname", "env", "source"},
 		ValueField: defaultValueField,
 		RuleName:   "global-process-metrics",
 	}
@@ -45,7 +45,7 @@ func TestProcessMetricsRoutes(t *testing.T) {
 	expected = decode.AlertRoute{
 		Series:     "process-metrics.some-title-2",
 		StatType:   statTypeGauge,
-		Dimensions: []string{"hostname", "env", "source"},
+		Dimensions: []string{"Hostname", "env", "source"},
 		ValueField: defaultValueField,
 		RuleName:   "global-process-metrics",
 	}
@@ -68,7 +68,7 @@ func TestRsyslogRateLimitRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "rsyslog.rate-limit-triggered",
 		StatType:   statTypeCounter,
-		Dimensions: []string{"hostname", "env"},
+		Dimensions: []string{"Hostname", "env"},
 		ValueField: defaultValueField,
 		RuleName:   "global-rsyslog-rate-limit",
 	}
@@ -92,7 +92,7 @@ func TestGearmanRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "gearman.success",
 		StatType:   statTypeCounter,
-		Dimensions: []string{"hostname", "function"},
+		Dimensions: []string{"Hostname", "function"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearman",
 	}
@@ -109,7 +109,7 @@ func TestGearmanRoutes(t *testing.T) {
 	expected = decode.AlertRoute{
 		Series:     "gearman.failure",
 		StatType:   statTypeCounter,
-		Dimensions: []string{"hostname", "function"},
+		Dimensions: []string{"Hostname", "function"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearman",
 	}
@@ -142,7 +142,7 @@ func TestGearcmdPassfailRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "gearcmd.passfail",
 		StatType:   statTypeGauge,
-		Dimensions: []string{"hostname", "function"},
+		Dimensions: []string{"Hostname", "function"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearcmd-passfail",
 	}
@@ -174,7 +174,7 @@ func TestGearcmdDurationRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "gearcmd.duration",
 		StatType:   statTypeGauge,
-		Dimensions: []string{"hostname", "function", "env"},
+		Dimensions: []string{"Hostname", "function", "env"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearcmd-duration",
 	}
@@ -197,7 +197,7 @@ func TestGearcmdHeartbeatRoutes(t *testing.T) {
 	expected := decode.AlertRoute{
 		Series:     "gearcmd.heartbeat",
 		StatType:   statTypeGauge,
-		Dimensions: []string{"hostname", "env", "function", "job_id", "try_number", "unit"},
+		Dimensions: []string{"Hostname", "env", "function", "job_id", "try_number", "unit"},
 		ValueField: defaultValueField,
 		RuleName:   "global-gearcmd-heartbeat",
 	}
