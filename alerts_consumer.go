@@ -17,7 +17,7 @@ import (
 var lg = logger.New("kinesis-alerts-consumer")
 var sfxSink *sfxclient.HTTPSink
 
-var defaultDimensions = []string{"hostname", "env"}
+var defaultDimensions = []string{"Hostname", "env"}
 
 // AlertsConsumer sends datapoints to SignalFX
 // It implements the kbc.Sender interface
@@ -62,6 +62,12 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	}
 	if timestamp.Before(c.minTimestamp) {
 		return []byte{}, []string{}, kbc.ErrMessageIgnored
+	}
+
+	// For backwards compatibility, add `Hostname` field (capitalized)
+	hostname, ok := fields["hostname"]
+	if ok {
+		fields["Hostname"] = hostname
 	}
 
 	// Create datapoints to send to SFX

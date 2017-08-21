@@ -54,7 +54,7 @@ func processMetricsRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     fmt.Sprintf("process-metrics.%s", title),
-			Dimensions: []string{"hostname", "env", "source"},
+			Dimensions: []string{"Hostname", "env", "source"},
 			StatType:   statType,
 			ValueField: defaultValueField,
 			RuleName:   "global-process-metrics",
@@ -84,7 +84,7 @@ func rsyslogRateLimitRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     "rsyslog.rate-limit-triggered",
-			Dimensions: []string{"hostname", "env"},
+			Dimensions: []string{"Hostname", "env"},
 			StatType:   statTypeCounter,
 			ValueField: defaultValueField,
 			RuleName:   "global-rsyslog-rate-limit",
@@ -121,7 +121,7 @@ func gearmanRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     fmt.Sprintf("gearman.%s", title),
-			Dimensions: []string{"hostname", "function"},
+			Dimensions: []string{"Hostname", "function"},
 			StatType:   statTypeCounter,
 			ValueField: defaultValueField,
 			RuleName:   "global-gearman",
@@ -158,7 +158,7 @@ func gearcmdPassfailRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     "gearcmd.passfail",
-			Dimensions: []string{"hostname", "function"},
+			Dimensions: []string{"Hostname", "function"},
 			StatType:   statTypeGauge,
 			ValueField: defaultValueField,
 			RuleName:   "global-gearcmd-passfail",
@@ -187,7 +187,7 @@ func gearcmdDurationRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     "gearcmd.duration",
-			Dimensions: []string{"hostname", "function", "env"},
+			Dimensions: []string{"Hostname", "function", "env"},
 			StatType:   statTypeGauge,
 			ValueField: defaultValueField,
 			RuleName:   "global-gearcmd-duration",
@@ -216,7 +216,7 @@ func gearcmdHeartbeatRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     "gearcmd.heartbeat",
-			Dimensions: []string{"hostname", "env", "function", "job_id", "try_number", "unit"},
+			Dimensions: []string{"Hostname", "env", "function", "job_id", "try_number", "unit"},
 			StatType:   statTypeGauge,
 			ValueField: defaultValueField,
 			RuleName:   "global-gearcmd-heartbeat",
