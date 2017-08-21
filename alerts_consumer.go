@@ -32,7 +32,7 @@ type AlertsConsumer struct {
 // with the encoded log to SendBatch()
 func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []string, err error) {
 	// Parse the log line
-	fields, err := decode.ParseAndEnhance(string(rawmsg), c.deployEnv, false, false, c.minTimestamp)
+	fields, err := decode.ParseAndEnhance(string(rawmsg), c.deployEnv, false, false, time.Unix(0, 0))
 	if err != nil {
 		return nil, []string{}, err
 	}
