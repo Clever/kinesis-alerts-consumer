@@ -25,6 +25,19 @@ type AlertsConsumer struct {
 	sfxSink      sfxclient.Sink
 	deployEnv    string
 	minTimestamp time.Time
+
+	rollups *Rollups
+}
+
+func NewAlertsConsumer(sfxSink sfxclient.Sink, deployEnv string, minTimestamp time.Time) *AlertsConsumer {
+	rollups := NewRollups(sfxSink)
+	go rollups.Run(context.Background())
+	return &AlertsConsumer{
+		sfxSink:      sfxSink,
+		deployEnv:    deployEnv,
+		minTimestamp: minTimestamp,
+		rollups:      rollups,
+	}
 }
 
 // ProcessMessage is called once per log to parse the log line and then reformat it
@@ -35,6 +48,10 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 	fields, err := decode.ParseAndEnhance(string(rawmsg), c.deployEnv, false, false, time.Unix(0, 0))
 	if err != nil {
 		return nil, []string{}, err
+	}
+
+	if err := c.rollups.Process(fields); err != nil {
+		return []byte{}, []string{}, err
 	}
 
 	return c.encodeMessage(fields)
