@@ -104,24 +104,36 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 				case bool:
 					dims[dim] = fmt.Sprintf("%t", t)
 				default:
-					return []byte{}, []string{}, fmt.Errorf("error casting dimension value. route=%s dim=%s val=%s", route.RuleName, dim, dimVal)
+					return []byte{}, []string{}, fmt.Errorf("error casting dimension value. rule=%s dim=%s val=%s", route.RuleName, dim, dimVal)
 				}
 			}
 		}
 
 		// Create datapoint
 		var pt *datapoint.Datapoint
+
+		// 3 cases
+		// 	(1) val exists and it's a float
+		// 	(2) val exists but it's NOT a float (error)
+		// 	(3) val doesnt exist => use default value
+		val, valOk := fields[route.ValueField].(float64)
+		if !valOk {
+			valInterface, valueFieldExists := fields[route.ValueField]
+			if valueFieldExists {
+				// case (2)
+				return []byte{}, []string{}, fmt.Errorf("value exists but is wrong type. rule=%s value_field=%s value=%s", route.RuleName, route.ValueField, valInterface)
+			}
+		}
+
 		if route.StatType == "counter" {
 			counterVal := int64(1)
-			val, ok := fields[route.ValueField].(float64)
-			if ok {
+			if valOk {
 				counterVal = int64(val)
 			}
 			pt = datapoint.New(route.Series, dims, datapoint.NewIntValue(counterVal), datapoint.Counter, timestamp)
 		} else if route.StatType == "gauge" {
 			gaugeVal := float64(0)
-			val, ok := fields[route.ValueField].(float64)
-			if ok {
+			if valOk {
 				gaugeVal = val
 			}
 			pt = datapoint.New(route.Series, dims, datapoint.NewFloatValue(gaugeVal), datapoint.Gauge, timestamp)

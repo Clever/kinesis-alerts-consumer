@@ -180,7 +180,35 @@ func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
 
 	_, _, err := consumer.encodeMessage(input)
 	assert.Error(t, err)
-	assert.EqualError(t, err, "error casting dimension value. route=rule-1 dim=dim_error val={}")
+	assert.EqualError(t, err, "error casting dimension value. rule=rule-1 dim=dim_error val={}")
+}
+
+func TestEncodeMessageErrorsIfValueExistsAndIsInvalidType(t *testing.T) {
+	t.Log("message error if trying to cast unknown type as SFX dimension")
+	consumer := AlertsConsumer{}
+	input := map[string]interface{}{
+		"rawlog":    "...",
+		"value":     "12345", //should fail, even though it's numeric its not the right type
+		"Hostname":  "my-hostname",
+		"env":       "my-env",
+		"timestamp": time.Time{},
+		"_kvmeta": map[string]interface{}{
+			"routes": []interface{}{
+				map[string]interface{}{
+					"type":        "alerts",
+					"series":      "series-name",
+					"dimensions":  []interface{}{},
+					"stat_type":   "counter",
+					"value_field": "value",
+					"rule":        "rule-1",
+				},
+			},
+		},
+	}
+
+	_, _, err := consumer.encodeMessage(input)
+	assert.Error(t, err)
+	assert.EqualError(t, err, "value exists but is wrong type. rule=rule-1 value_field=value value=12345")
 }
 
 func TestEncodeMessageWithGauge(t *testing.T) {
