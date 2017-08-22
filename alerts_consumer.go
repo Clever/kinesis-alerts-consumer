@@ -93,9 +93,19 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 		// Look up dimensions (custom + default)
 		dims := map[string]string{}
 		for _, dim := range route.Dimensions {
-			dimVal, ok := fields[dim].(string)
+			dimVal, ok := fields[dim]
 			if ok {
-				dims[dim] = dimVal
+				switch t := dimVal.(type) {
+				case string:
+					dims[dim] = t
+				case float64:
+					// Drop data after the decimal and cast to string (ex. 3.2 => "3")
+					dims[dim] = fmt.Sprintf("%.0f", t)
+				case bool:
+					dims[dim] = fmt.Sprintf("%t", t)
+				default:
+					return []byte{}, []string{}, fmt.Errorf("error casting dimension value. route=%s dim=%s val=%s", route.RuleName, dim, dimVal)
+				}
 			}
 		}
 
