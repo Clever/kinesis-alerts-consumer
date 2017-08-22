@@ -21,10 +21,9 @@ func TestRollupRequestFinished(t *testing.T) {
 	mockSink := &MockSink{}
 	r := NewRollups(mockSink)
 	r.scheduler.ReportingDelayNs = (1 * time.Second).Nanoseconds()
-	//ctx, cancel := context.WithCancel(context.Background())
-	//defer cancel()
-	//go r.Run(ctx)
-	go r.Run(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go r.Run(ctx)
 	for count := 0; count < 100; count++ {
 		r.Process(map[string]interface{}{
 			"env":           "production",

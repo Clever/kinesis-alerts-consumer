@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -39,7 +40,25 @@ func (r *Rollups) Run(ctx context.Context) error {
 }
 
 func (r *Rollups) Process(fields map[string]interface{}) error {
-	if fields["env"] != "" && fields["container_app"] != "" && fields["title"] == "request-finished" && fields["via"] == "kayvee-middleware" {
+
+	if contains(fields, "env") && contains(fields, "container_app") && contains(fields, "canary") && contains(fields, "response-time") && contains(fields, "status-code") &&
+		fields["title"] == "request-finished" && fields["via"] == "kayvee-middleware" {
+
+		if _, ok := fields["env"].(string); !ok {
+			return fmt.Errorf("expected env to be string, got %s", reflect.TypeOf(fields["env"]))
+		}
+		if _, ok := fields["container_app"].(string); !ok {
+			return fmt.Errorf("expected container_app to be string, got %s", reflect.TypeOf(fields["container_app"]))
+		}
+		if _, ok := fields["canary"].(bool); !ok {
+			return fmt.Errorf("expected canary to be bool, got %s", reflect.TypeOf(fields["canary"]))
+		}
+		if _, ok := fields["response-time"].(float64); !ok {
+			return fmt.Errorf("expected response-time to be float64, got %s", reflect.TypeOf(fields["response-time"]))
+		}
+		if _, ok := fields["status-code"].(float64); !ok {
+			return fmt.Errorf("expected status-code to be float64, got %s", reflect.TypeOf(fields["status-code"]))
+		}
 
 		// rollup response times
 		{
@@ -51,7 +70,7 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 			dimensionsKey := join(dimensions, "-")
 			bucket, ok := r.rollupsRequestFinishedResponseTime[dimensionsKey]
 			if !ok {
-				lg.InfoD("rollup-create", map[string]interface{}{"key": dimensionsKey})
+				lg.InfoD("rollup-create", map[string]interface{}{"metric": "request-finished-response-time", "key": dimensionsKey})
 				bucket = sfxclient.NewRollingBucket("request-finished-response-time", dimensions)
 				r.rollupsRequestFinishedResponseTime[dimensionsKey] = bucket
 				r.scheduler.AddCallback(bucket)
@@ -70,7 +89,7 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 			dimensionsKey := join(dimensions, "-")
 			bucket, ok := r.rollupsRequestFinishedStatusCode[dimensionsKey]
 			if !ok {
-				lg.InfoD("rollup-create", map[string]interface{}{"key": dimensionsKey})
+				lg.InfoD("rollup-create", map[string]interface{}{"metric": "request-finished-status-code", "key": dimensionsKey})
 				bucket = &sfxclient.CumulativeBucket{
 					MetricName: "request-finished-status-code",
 					Dimensions: dimensions,
@@ -83,6 +102,11 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 	}
 
 	return nil
+}
+
+func contains(m map[string]interface{}, key string) bool {
+	_, ok := m[key]
+	return ok
 }
 
 // join map values together in sorted key order
