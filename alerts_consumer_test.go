@@ -100,6 +100,59 @@ func TestEncodeMessage(t *testing.T) {
 	assert.Equal(t, expectedPts, pts)
 }
 
+func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
+	t.Log("is able to write SFX dimensions from JSON fields which have float or bool values")
+	consumer := AlertsConsumer{}
+	input := map[string]interface{}{
+		"rawlog":    "...",
+		"value":     float64(123),
+		"dim_a":     "dim_a_val",
+		"dim_float": float64(3.2),
+		"dim_bool":  true,
+		"Hostname":  "my-hostname",
+		"env":       "my-env",
+		"timestamp": time.Time{},
+		"_kvmeta": map[string]interface{}{
+			"routes": []interface{}{
+				map[string]interface{}{
+					"type":        "alerts",
+					"series":      "series-name",
+					"dimensions":  []interface{}{"dim_a", "dim_float", "dim_bool"},
+					"stat_type":   "counter",
+					"value_field": "value",
+					"rule":        "rule-1",
+				},
+			},
+		},
+	}
+
+	output, tags, err := consumer.encodeMessage(input)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(tags))
+	assert.Equal(t, string("default"), tags[0])
+
+	expectedPts := []datapoint.Datapoint{
+		datapoint.Datapoint{
+			Metric: "series-name",
+			Dimensions: map[string]string{
+				"dim_a":     "dim_a_val",
+				"dim_float": "3",
+				"dim_bool":  "true",
+				"Hostname":  "my-hostname",
+				"env":       "my-env",
+			},
+			Value:      datapoint.NewIntValue(123),
+			MetricType: datapoint.Counter,
+			Timestamp:  time.Time{},
+		},
+	}
+
+	pts := []datapoint.Datapoint{}
+	err = json.Unmarshal(output, &pts)
+	assert.NoError(t, err)
+
+	assert.Equal(t, expectedPts, pts)
+}
 func TestEncodeMessageWithGauge(t *testing.T) {
 	t.Log("writes a single Gauge as a datapoint")
 	consumer := AlertsConsumer{}
