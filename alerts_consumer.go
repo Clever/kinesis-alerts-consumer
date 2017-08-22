@@ -104,7 +104,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 				case bool:
 					dims[dim] = fmt.Sprintf("%t", t)
 				default:
-					lg.WarnD("invalid-dimension-value", logger.M{"msg": "Unable to cast dimension value", "dim": dim, "val": dimVal, "route": route.RuleName})
+					return []byte{}, []string{}, fmt.Errorf("error casting dimension value. route=%s dim=%s val=%s", route.RuleName, dim, dimVal)
 				}
 			}
 		}
