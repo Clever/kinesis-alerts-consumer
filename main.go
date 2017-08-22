@@ -34,6 +34,7 @@ func main() {
 		LogFile:       "/tmp/kinesis-consumer-" + time.Now().Format(time.RFC3339),
 		BatchCount:    100,
 		BatchInterval: time.Second * 5,
+		ReadRateLimit: getIntEnv("READ_RATE_LIMIT"),
 	}
 
 	sfxSink := sfxclient.NewHTTPSink()
