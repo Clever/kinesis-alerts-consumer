@@ -7,5 +7,6 @@ ADD jars jars
 ADD consumer.properties.template .
 ADD run_kcl.sh .
 ADD kinesis-consumer kinesis-consumer
+ADD kvconfig.yml kvconfig.yml
 
 ENTRYPOINT ["/bin/bash", "./run_kcl.sh"]

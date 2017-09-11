@@ -3,12 +3,15 @@ package main
 import (
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
+	"github.com/kardianos/osext"
 	"github.com/signalfx/golib/sfxclient"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
+	"github.com/Clever/kayvee-go/logger"
 )
 
 // getEnv returns required environment variable
@@ -29,7 +32,20 @@ func getIntEnv(key string) int {
 	return value
 }
 
+func setupLogRouting() {
+	dir, err := osext.ExecutableFolder()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = logger.SetGlobalRouting(path.Join(dir, "kvconfig.yml"))
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
+	setupLogRouting()
+
 	config := kbc.Config{
 		LogFile:       "/tmp/kinesis-consumer-" + time.Now().Format(time.RFC3339),
 		BatchCount:    100,
