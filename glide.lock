@@ -1,8 +1,8 @@
-hash: bdd7104355c1af785d9651c612c910b232df642ed802a5bd4a2e9e67ef184ba4
-updated: 2017-08-21T15:12:20.840209151Z
+hash: 1c15021d83a406bc89e9a7a06e02346e9a3d6fb880c109a1536cf2d103b16bb6
+updated: 2017-09-11T20:15:02.040696866Z
 imports:
 - name: github.com/Clever/amazon-kinesis-client-go
-  version: 7f39898b70c287c2ecdfa9f8d6fec28ed48485e0
+  version: a559c33272e4a6ca153fea95f1c8519dcee664b2
   subpackages:
   - batchconsumer
   - batchconsumer/stats
@@ -23,6 +23,8 @@ imports:
   - proto
 - name: github.com/jeromer/syslogparser
   version: 0e4ae46ea3f08de351074b643d649d5d00661a3c
+- name: github.com/kardianos/osext
+  version: c2c54e542fb797ad986b31721e1baedf214ca413
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: github.com/signalfx/com_signalfx_metrics_protobuf
@@ -54,7 +56,7 @@ imports:
   subpackages:
   - rate
 - name: gopkg.in/Clever/kayvee-go.v6
-  version: 096364e316a52652d3493be702d8105d8d01db84
+  version: e6f953eac5b9d8e41dff6587e0ae6d58b50da5c5
   subpackages:
   - logger
   - router
@@ -77,3 +79,4 @@ testImports:
   version: 69483b4bd14f5845b5a1e55bca19e954e827f1d0
   subpackages:
   - assert
+  - require

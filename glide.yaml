@@ -8,3 +8,4 @@ import:
   subpackages:
   - logger
 - package: github.com/signalfx/golib
+- package: github.com/kardianos/osext

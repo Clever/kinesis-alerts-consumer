@@ -3,12 +3,15 @@ package main
 import (
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
+	"github.com/kardianos/osext"
 	"github.com/signalfx/golib/sfxclient"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
+	"github.com/Clever/kayvee-go/logger"
 )
 
 // getEnv returns required environment variable
@@ -27,6 +30,17 @@ func getIntEnv(key string) int {
 		log.Panicf("Environment variable `%s` is not an integer: %s", key, err.Error())
 	}
 	return value
+}
+
+func init() {
+	dir, err := osext.ExecutableFolder()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = logger.SetGlobalRouting(path.Join(dir, "kvconfig.yml"))
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func main() {
