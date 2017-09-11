@@ -32,7 +32,7 @@ func getIntEnv(key string) int {
 	return value
 }
 
-func init() {
+func setupLogRouting() {
 	dir, err := osext.ExecutableFolder()
 	if err != nil {
 		log.Fatal(err)
@@ -44,6 +44,8 @@ func init() {
 }
 
 func main() {
+	setupLogRouting()
+
 	config := kbc.Config{
 		LogFile:       "/tmp/kinesis-consumer-" + time.Now().Format(time.RFC3339),
 		BatchCount:    100,
