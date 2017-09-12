@@ -99,3 +99,85 @@ func TestRollupRequestFinished(t *testing.T) {
 		assert.Equal(t, expectedPts[i], mockSink.pts[i])
 	}
 }
+
+func TestRollupRequestFinishedThrift(t *testing.T) {
+	mockSink := &MockSink{}
+	r := NewRollups(mockSink)
+	r.scheduler.ReportingDelayNs = (1 * time.Second).Nanoseconds()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go r.Run(ctx)
+	for count := 0; count < 100; count++ {
+		r.Process(map[string]interface{}{
+			"env":           "production",
+			"container_app": "systemic",
+			"title":         "request_finished",
+			"proto":         "thrift",
+			"response_time": float64(1000000),
+			"type_id":       float64(2),
+		})
+	}
+
+	time.Sleep(1*time.Second + 100*time.Millisecond)
+
+	expectedPts := []datapoint.Datapoint{
+		datapoint.Datapoint{Metric: "request-finished-response-time.count",
+			Dimensions: map[string]string{"env": "production", "container_app": "systemic"},
+			Value:      datapoint.NewIntValue(100),
+			MetricType: datapoint.Counter,
+			Timestamp:  time.Time{},
+			Meta:       map[interface{}]interface{}{},
+		},
+		datapoint.Datapoint{
+			Metric:     "request-finished-response-time.sum",
+			Dimensions: map[string]string{"env": "production", "container_app": "systemic"},
+			Value:      datapoint.NewFloatValue(100000000),
+			MetricType: datapoint.Counter,
+			Timestamp:  time.Time{},
+			Meta:       map[interface{}]interface{}{},
+		},
+		datapoint.Datapoint{
+			Metric:     "request-finished-response-time.sumsquare",
+			Dimensions: map[string]string{"env": "production", "container_app": "systemic"},
+			Value:      datapoint.NewFloatValue(100000000000000),
+			MetricType: datapoint.Counter,
+			Timestamp:  time.Time{},
+			Meta:       map[interface{}]interface{}{},
+		},
+		datapoint.Datapoint{
+			Metric:     "request-finished-type-id.count",
+			Dimensions: map[string]string{"env": "production", "container_app": "systemic", "type_id": "2"},
+			Value:      datapoint.NewIntValue(100),
+			MetricType: datapoint.Counter,
+			Timestamp:  time.Time{},
+			Meta:       map[interface{}]interface{}{},
+		},
+		datapoint.Datapoint{
+			Metric:     "request-finished-type-id.sum",
+			Dimensions: map[string]string{"env": "production", "container_app": "systemic", "type_id": "2"},
+			Value:      datapoint.NewIntValue(100),
+			MetricType: datapoint.Counter,
+			Timestamp:  time.Time{},
+			Meta:       map[interface{}]interface{}{},
+		},
+		datapoint.Datapoint{
+			Metric:     "request-finished-type-id.sumsquare",
+			Dimensions: map[string]string{"env": "production", "container_app": "systemic", "type_id": "2"},
+			Value:      datapoint.NewFloatValue(100),
+			MetricType: datapoint.Counter,
+			Timestamp:  time.Time{},
+			Meta:       map[interface{}]interface{}{},
+		},
+	}
+
+	sort.Sort(ByMetric(expectedPts))
+	sort.Sort(ByMetric(mockSink.pts))
+
+	if len(expectedPts) != len(mockSink.pts) {
+		// array Equal() prints less detail, but is sufficient to diagnose this failure case
+		require.Equal(t, expectedPts, mockSink.pts)
+	}
+	for i := range expectedPts {
+		assert.Equal(t, expectedPts[i], mockSink.pts[i])
+	}
+}
