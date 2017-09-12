@@ -26,7 +26,7 @@ func TestRollupRequestFinished(t *testing.T) {
 	go r.Run(ctx)
 	for count := 0; count < 100; count++ {
 		r.Process(map[string]interface{}{
-			"env":           "production",
+			"deploy_env":    "production",
 			"container_app": "app-service",
 			"title":         "request-finished",
 			"via":           "kayvee-middleware",
@@ -109,7 +109,7 @@ func TestRollupRequestFinishedThrift(t *testing.T) {
 	go r.Run(ctx)
 	for count := 0; count < 100; count++ {
 		r.Process(map[string]interface{}{
-			"env":           "production",
+			"deploy_env":    "production",
 			"container_app": "systemic",
 			"title":         "request_finished",
 			"proto":         "thrift",

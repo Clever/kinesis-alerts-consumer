@@ -46,10 +46,10 @@ func (r *Rollups) Run(ctx context.Context) error {
 func (r *Rollups) Process(fields map[string]interface{}) error {
 
 	if fields["title"] == "request-finished" && fields["via"] == "kayvee-middleware" &&
-		contains(fields, "env") && contains(fields, "container_app") && contains(fields, "canary") && contains(fields, "response-time") && contains(fields, "status-code") {
+		contains(fields, "deploy_env") && contains(fields, "container_app") && contains(fields, "canary") && contains(fields, "response-time") && contains(fields, "status-code") {
 
-		if _, ok := fields["env"].(string); !ok {
-			return fmt.Errorf("expected env to be string, got %s", reflect.TypeOf(fields["env"]))
+		if _, ok := fields["deploy_env"].(string); !ok {
+			return fmt.Errorf("expected deploy_env to be string, got %s", reflect.TypeOf(fields["deploy_env"]))
 		}
 		if _, ok := fields["container_app"].(string); !ok {
 			return fmt.Errorf("expected container_app to be string, got %s", reflect.TypeOf(fields["container_app"]))
@@ -67,7 +67,7 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 		// rollup response times
 		{
 			dimensions := map[string]string{
-				"env":           fields["env"].(string),
+				"env":           fields["deploy_env"].(string),
 				"container_app": fields["container_app"].(string),
 				"canary":        fmt.Sprintf("%t", fields["canary"].(bool)),
 			}
@@ -85,7 +85,7 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 		// count status codes
 		{
 			dimensions := map[string]string{
-				"env":           fields["env"].(string),
+				"env":           fields["deploy_env"].(string),
 				"container_app": fields["container_app"].(string),
 				"canary":        fmt.Sprintf("%t", fields["canary"].(bool)),
 				"status-code":   fmt.Sprintf("%d", int(fields["status-code"].(float64))),
@@ -104,10 +104,10 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 			bucket.Add(1)
 		}
 	} else if fields["proto"] == "thrift" && fields["title"] == "request_finished" &&
-		contains(fields, "env") && contains(fields, "container_app") && contains(fields, "response_time") && contains(fields, "type_id") {
+		contains(fields, "deploy_env") && contains(fields, "container_app") && contains(fields, "response_time") && contains(fields, "type_id") {
 
-		if _, ok := fields["env"].(string); !ok {
-			return fmt.Errorf("expected env to be string, got %s", reflect.TypeOf(fields["env"]))
+		if _, ok := fields["deploy_env"].(string); !ok {
+			return fmt.Errorf("expected deploy_env to be string, got %s", reflect.TypeOf(fields["deploy_env"]))
 		}
 		if _, ok := fields["container_app"].(string); !ok {
 			return fmt.Errorf("expected container_app to be string, got %s", reflect.TypeOf(fields["container_app"]))
@@ -122,7 +122,7 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 		// rollup thrift response times
 		{
 			dimensions := map[string]string{
-				"env":           fields["env"].(string),
+				"env":           fields["deploy_env"].(string),
 				"container_app": fields["container_app"].(string),
 			}
 			dimensionsKey := join(dimensions, "-")
@@ -139,7 +139,7 @@ func (r *Rollups) Process(fields map[string]interface{}) error {
 		// count thrift status codes, i.e. type_id
 		{
 			dimensions := map[string]string{
-				"env":           fields["env"].(string),
+				"env":           fields["deploy_env"].(string),
 				"container_app": fields["container_app"].(string),
 				"type_id":       fmt.Sprintf("%d", int(fields["type_id"].(float64))),
 			}
