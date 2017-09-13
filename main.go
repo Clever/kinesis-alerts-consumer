@@ -11,7 +11,7 @@ import (
 	"github.com/signalfx/golib/sfxclient"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
-	"github.com/Clever/kayvee-go/logger"
+	"gopkg.in/Clever/kayvee-go.v6/logger"
 )
 
 // getEnv returns required environment variable
