@@ -1,8 +1,8 @@
 hash: 1c15021d83a406bc89e9a7a06e02346e9a3d6fb880c109a1536cf2d103b16bb6
-updated: 2017-09-11T20:15:02.040696866Z
+updated: 2017-09-13T19:25:47.64748189Z
 imports:
 - name: github.com/Clever/amazon-kinesis-client-go
-  version: a559c33272e4a6ca153fea95f1c8519dcee664b2
+  version: 32d4d33f00a3672a8cc76af1361ff982ed62d1ad
   subpackages:
   - batchconsumer
   - batchconsumer/stats
