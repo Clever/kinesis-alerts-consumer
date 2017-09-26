@@ -22,21 +22,19 @@ var defaultDimensions = []string{"Hostname", "env"}
 // AlertsConsumer sends datapoints to SignalFX
 // It implements the kbc.Sender interface
 type AlertsConsumer struct {
-	sfxSink      sfxclient.Sink
-	deployEnv    string
-	minTimestamp time.Time
+	sfxSink   sfxclient.Sink
+	deployEnv string
 
 	rollups *Rollups
 }
 
-func NewAlertsConsumer(sfxSink sfxclient.Sink, deployEnv string, minTimestamp time.Time) *AlertsConsumer {
+func NewAlertsConsumer(sfxSink sfxclient.Sink, deployEnv string) *AlertsConsumer {
 	rollups := NewRollups(sfxSink)
 	go rollups.Run(context.Background())
 	return &AlertsConsumer{
-		sfxSink:      sfxSink,
-		deployEnv:    deployEnv,
-		minTimestamp: minTimestamp,
-		rollups:      rollups,
+		sfxSink:   sfxSink,
+		deployEnv: deployEnv,
+		rollups:   rollups,
 	}
 }
 
@@ -45,7 +43,7 @@ func NewAlertsConsumer(sfxSink sfxclient.Sink, deployEnv string, minTimestamp ti
 // with the encoded log to SendBatch()
 func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []string, err error) {
 	// Parse the log line
-	fields, err := decode.ParseAndEnhance(string(rawmsg), c.deployEnv, false, false, time.Unix(0, 0))
+	fields, err := decode.ParseAndEnhance(string(rawmsg), c.deployEnv)
 	if err != nil {
 		return nil, []string{}, err
 	}
@@ -73,20 +71,16 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 		return nil, nil, kbc.ErrMessageIgnored
 	}
 
-	timestamp, ok := fields["timestamp"].(time.Time)
-	if !ok {
-		return []byte{}, []string{}, fmt.Errorf("unable parse Time from message's 'timestamp' field")
-	}
-	if timestamp.Before(c.minTimestamp) {
-		return []byte{}, []string{}, kbc.ErrMessageIgnored
-	}
-
 	// For backwards compatibility, add `Hostname` field (capitalized)
 	hostname, ok := fields["hostname"]
 	if ok {
 		fields["Hostname"] = hostname
 	}
 
+	timestamp, ok := fields["timestamp"].(time.Time)
+	if !ok {
+		return []byte{}, []string{}, fmt.Errorf("unable parse Time from message's 'timestamp' field")
+	}
 	// Create datapoints to send to SFX
 	points := []datapoint.Datapoint{}
 	for _, route := range routes {

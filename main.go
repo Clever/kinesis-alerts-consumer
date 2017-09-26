@@ -55,12 +55,10 @@ func main() {
 
 	sfxSink := sfxclient.NewHTTPSink()
 	sfxSink.AuthToken = getEnv("SFX_API_TOKEN")
-	minTimestamp := getIntEnv("MINIMUM_TIMESTAMP")
-	ac := NewAlertsConsumer(
-		sfxSink,
-		getEnv("DEPLOY_ENV"),
-		time.Unix(int64(minTimestamp), 0),
-	)
+	ac := &AlertsConsumer{
+		sfxSink:   sfxSink,
+		deployEnv: getEnv("DEPLOY_ENV"),
+	}
 
 	// Track Max Delay
 	go func() {
