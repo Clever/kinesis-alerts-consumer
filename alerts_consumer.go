@@ -178,5 +178,11 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 		ptRefs = append(ptRefs, &pts[idx])
 	}
 
-	return c.sfxSink.AddDatapoints(context.TODO(), ptRefs)
+	if err := c.sfxSink.AddDatapoints(context.TODO(), ptRefs); err != nil {
+		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
+			return kbc.PartialSendBatchError{ErrMessage: err.Error(), FailedMessages: batch}
+		}
+		return err
+	}
+	return nil
 }
