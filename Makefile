@@ -5,7 +5,7 @@ APP_NAME := kinesis-alerts-consumer
 SHELL := /bin/bash
 PKGS := $(shell go list ./... | grep -v /vendor )
 .PHONY: download_jars run build
-$(eval $(call golang-version-check,1.8))
+$(eval $(call golang-version-check,1.9))
 
 TMP_DIR := ./tmp-jars
 JAR_DIR := ./jars/
@@ -41,11 +41,7 @@ download_jars:
 
 all: test build
 
-$(GOPATH)/bin/glide:
-	@go get github.com/Masterminds/glide
 
-install_deps: $(GOPATH)/bin/glide
-	@$(GOPATH)/bin/glide install
 
 build:
 	CGO_ENABLED=0 go build -a -installsuffix cgo -o kinesis-consumer
@@ -63,3 +59,7 @@ run: docker_build
 test: $(PKGS)
 $(PKGS): golang-test-all-deps
 	$(call golang-test-all,$@)
+
+
+install_deps: golang-dep-vendor-deps
+	$(call golang-dep-vendor)
