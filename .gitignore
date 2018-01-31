@@ -12,3 +12,4 @@ kinesis-consumer
 kinesis-alerts-consumer
 jars
 bin/
+tmp-jars/
