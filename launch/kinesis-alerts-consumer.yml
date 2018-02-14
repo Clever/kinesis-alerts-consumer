@@ -16,4 +16,13 @@ shepherds:
 - "nathan.leiby@clever.com"
 expose: []
 team: "eng-infra"
-use_iam_roles: true
+aws:
+  dynamodb:
+    read:
+    - kinesis-alerts-consumer
+    write:
+    - kinesis-alerts-consumer
+  managed:
+    clever:
+    - CloudWatchMetricsWriter
+    - KinesisLogsConsumer
