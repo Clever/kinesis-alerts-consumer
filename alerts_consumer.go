@@ -11,7 +11,7 @@ import (
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
 	"github.com/Clever/amazon-kinesis-client-go/decode"
-	"github.com/Clever/kayvee-go/logger"
+	"gopkg.in/Clever/kayvee-go.v6/logger"
 )
 
 var lg = logger.New("kinesis-alerts-consumer")
