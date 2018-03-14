@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/sfxclient"
 	"golang.org/x/net/context"
 
@@ -22,13 +23,18 @@ var defaultDimensions = []string{"Hostname", "env"}
 // AlertsConsumer sends datapoints to SignalFX
 // It implements the kbc.Sender interface
 type AlertsConsumer struct {
-	sfxSink   sfxclient.Sink
+	sfxSink   httpSinkInterface
 	deployEnv string
 
 	rollups *Rollups
 }
 
-func NewAlertsConsumer(sfxSink sfxclient.Sink, deployEnv string) *AlertsConsumer {
+type httpSinkInterface interface {
+	AddDatapoints(context.Context, []*datapoint.Datapoint) error
+	AddEvents(context.Context, []*event.Event) error
+}
+
+func NewAlertsConsumer(sfxSink httpSinkInterface, deployEnv string) *AlertsConsumer {
 	rollups := NewRollups(sfxSink)
 	go rollups.Run(context.Background())
 	return &AlertsConsumer{
@@ -53,6 +59,11 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 	}
 
 	return c.encodeMessage(fields)
+}
+
+type EncodeOutput struct {
+	Datapoints []*datapoint.Datapoint
+	Events     []*event.Event
 }
 
 func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, []string, error) {
@@ -81,8 +92,13 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	if !ok {
 		return []byte{}, []string{}, fmt.Errorf("unable parse Time from message's 'timestamp' field")
 	}
-	// Create datapoints to send to SFX
-	points := []datapoint.Datapoint{}
+
+	// Create batch item from message
+	eo := EncodeOutput{
+		Datapoints: []*datapoint.Datapoint{},
+		Events:     []*event.Event{},
+	}
+
 	for _, route := range routes {
 		// Look up dimensions (custom + default)
 		dims := map[string]string{}
@@ -103,8 +119,8 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			}
 		}
 
-		// Create datapoint
 		var pt *datapoint.Datapoint
+		var evt *event.Event
 
 		// 3 cases
 		// 	(1) val exists and it's a float
@@ -131,15 +147,22 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 				gaugeVal = val
 			}
 			pt = datapoint.New(route.Series, dims, datapoint.NewFloatValue(gaugeVal), datapoint.Gauge, timestamp)
+		} else if route.StatType == "event" {
+			// Custom Stat type NOT supported by Kayvee routing
+			// Use Case: send app lifecycle events as "events" to SignalFX
+			evt = event.New(route.Series, event.USERDEFINED, dims, timestamp)
 		} else {
 			return []byte{}, []string{}, fmt.Errorf("invalid StatType in route: %s", route.StatType)
 		}
 
-		points = append(points, *pt)
+		if pt != nil {
+			eo.Datapoints = append(eo.Datapoints, pt)
+		} else if evt != nil {
+			eo.Events = append(eo.Events, evt)
+		}
 	}
 
-	// May return more than one SFX datapoint
-	out, err := json.Marshal(points)
+	out, err := json.Marshal(&eo)
 	if err != nil {
 		return []byte{}, []string{}, err
 	}
@@ -149,18 +172,19 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 
 // SendBatch is called once per batch per tag
 func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
-	pts := []datapoint.Datapoint{}
+	pts := []*datapoint.Datapoint{}
+	evts := []*event.Event{}
 	for _, b := range batch {
-		batchPts := []datapoint.Datapoint{}
-		err := json.Unmarshal(b, &batchPts)
+		eo := EncodeOutput{}
+		err := json.Unmarshal(b, &eo)
 		if err != nil {
 			return err
 		}
 
-		pts = append(pts, batchPts...)
+		pts = append(pts, eo.Datapoints...)
+		evts = append(evts, eo.Events...)
 	}
 
-	ptRefs := []*datapoint.Datapoint{}
 	for idx := range pts {
 		updateMaxDelay(pts[idx].Timestamp)
 
@@ -175,14 +199,21 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 		if isRecent(pts[idx].Timestamp, 30*time.Second) {
 			pts[idx].Timestamp = time.Time{}
 		}
-		ptRefs = append(ptRefs, &pts[idx])
 	}
 
-	if err := c.sfxSink.AddDatapoints(context.TODO(), ptRefs); err != nil {
+	if err := c.sfxSink.AddDatapoints(context.TODO(), pts); err != nil {
 		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
-			return kbc.PartialSendBatchError{ErrMessage: err.Error(), FailedMessages: batch}
+			return kbc.PartialSendBatchError{ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch}
 		}
 		return err
 	}
+
+	if err := c.sfxSink.AddEvents(context.TODO(), evts); err != nil {
+		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
+			return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
+		}
+		return err
+	}
+
 	return nil
 }

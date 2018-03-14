@@ -10,6 +10,7 @@ import (
 const defaultValueField = "value"
 const statTypeCounter = "counter"
 const statTypeGauge = "gauge"
+const statTypeEvent = "event"
 
 func globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	routes := []decode.AlertRoute{}
@@ -24,6 +25,7 @@ func globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	routes = append(routes, gearcmdDurationRoutes(fields)...)
 	routes = append(routes, gearcmdHeartbeatRoutes(fields)...)
 	routes = append(routes, wagCircuitBreakerRoutes(fields)...)
+	routes = append(routes, appLifecycleRoutes(fields)...)
 
 	return routes
 }
@@ -248,4 +250,59 @@ func wagCircuitBreakerRoutes(fields map[string]interface{}) []decode.AlertRoute 
 			RuleName:   "global-wag-circuit-breakers",
 		},
 	}
+}
+
+var allowedLifecycleEvents = []string{
+	"app_deploying",
+	"app_scaling",
+	"app_rollback",
+	"app_stopping",
+	//"app_freezing",
+	//"app_unfreezing",
+	"app_restarting",
+	"app_canary",
+	"app_canaryscaling",
+}
+
+// App Lifecycle routes
+func appLifecycleRoutes(fields map[string]interface{}) []decode.AlertRoute {
+	category, ok := fields["category"].(string)
+	if !ok {
+		return []decode.AlertRoute{}
+	}
+
+	title, ok := fields["title"].(string)
+	if !ok {
+		return []decode.AlertRoute{}
+	}
+
+	if category != "app_lifecycle" || !listContains(allowedLifecycleEvents, title) {
+		return []decode.AlertRoute{}
+	}
+
+	return []decode.AlertRoute{
+		decode.AlertRoute{
+			Series: "app_lifecycle",
+			Dimensions: []string{
+				"container_app",
+				"container_env",
+				"launched_scope",
+				"title",
+				"user",
+				"version",
+				"team",
+			},
+			StatType: statTypeEvent,
+			RuleName: "global-app-lifecycle",
+		},
+	}
+}
+
+func listContains(list []string, s string) bool {
+	for _, item := range list {
+		if item == s {
+			return true
+		}
+	}
+	return false
 }

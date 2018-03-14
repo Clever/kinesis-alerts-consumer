@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type ByMetric []datapoint.Datapoint
+type ByMetric []*datapoint.Datapoint
 
 func (m ByMetric) Len() int           { return len(m) }
 func (m ByMetric) Swap(i, j int)      { m[i], m[j] = m[j], m[i] }
 func (m ByMetric) Less(i, j int) bool { return m[i].Metric < m[j].Metric }
 
 func TestRollupRequestFinished(t *testing.T) {
-	mockSink := &MockSink{}
+	mockSink := &MockHTTPSink{}
 	r := NewRollups(mockSink)
 	r.scheduler.ReportingDelayNs = (1 * time.Second).Nanoseconds()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,15 +38,15 @@ func TestRollupRequestFinished(t *testing.T) {
 
 	time.Sleep(1*time.Second + 100*time.Millisecond)
 
-	expectedPts := []datapoint.Datapoint{
-		datapoint.Datapoint{Metric: "request-finished-response-time.count",
+	expectedPts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{Metric: "request-finished-response-time.count",
 			Dimensions: map[string]string{"env": "production", "container_app": "app-service", "canary": "false"},
 			Value:      datapoint.NewIntValue(100),
 			MetricType: datapoint.Counter,
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-response-time.sum",
 			Dimensions: map[string]string{"env": "production", "container_app": "app-service", "canary": "false"},
 			Value:      datapoint.NewFloatValue(100000000),
@@ -54,7 +54,7 @@ func TestRollupRequestFinished(t *testing.T) {
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-response-time.sumsquare",
 			Dimensions: map[string]string{"env": "production", "container_app": "app-service", "canary": "false"},
 			Value:      datapoint.NewFloatValue(100000000000000),
@@ -62,7 +62,7 @@ func TestRollupRequestFinished(t *testing.T) {
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-status-code.count",
 			Dimensions: map[string]string{"env": "production", "container_app": "app-service", "canary": "false", "status-code": "200"},
 			Value:      datapoint.NewIntValue(100),
@@ -70,7 +70,7 @@ func TestRollupRequestFinished(t *testing.T) {
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-status-code.sum",
 			Dimensions: map[string]string{"env": "production", "container_app": "app-service", "canary": "false", "status-code": "200"},
 			Value:      datapoint.NewIntValue(100),
@@ -78,7 +78,7 @@ func TestRollupRequestFinished(t *testing.T) {
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-status-code.sumsquare",
 			Dimensions: map[string]string{"env": "production", "container_app": "app-service", "canary": "false", "status-code": "200"},
 			Value:      datapoint.NewFloatValue(100),
@@ -101,7 +101,7 @@ func TestRollupRequestFinished(t *testing.T) {
 }
 
 func TestRollupRequestFinishedThrift(t *testing.T) {
-	mockSink := &MockSink{}
+	mockSink := &MockHTTPSink{}
 	r := NewRollups(mockSink)
 	r.scheduler.ReportingDelayNs = (1 * time.Second).Nanoseconds()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -120,15 +120,15 @@ func TestRollupRequestFinishedThrift(t *testing.T) {
 
 	time.Sleep(1*time.Second + 100*time.Millisecond)
 
-	expectedPts := []datapoint.Datapoint{
-		datapoint.Datapoint{Metric: "request-finished-response-time.count",
+	expectedPts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{Metric: "request-finished-response-time.count",
 			Dimensions: map[string]string{"env": "production", "container_app": "systemic"},
 			Value:      datapoint.NewIntValue(100),
 			MetricType: datapoint.Counter,
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-response-time.sum",
 			Dimensions: map[string]string{"env": "production", "container_app": "systemic"},
 			Value:      datapoint.NewFloatValue(100000000),
@@ -136,7 +136,7 @@ func TestRollupRequestFinishedThrift(t *testing.T) {
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-response-time.sumsquare",
 			Dimensions: map[string]string{"env": "production", "container_app": "systemic"},
 			Value:      datapoint.NewFloatValue(100000000000000),
@@ -144,7 +144,7 @@ func TestRollupRequestFinishedThrift(t *testing.T) {
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-type-id.count",
 			Dimensions: map[string]string{"env": "production", "container_app": "systemic", "type_id": "2"},
 			Value:      datapoint.NewIntValue(100),
@@ -152,7 +152,7 @@ func TestRollupRequestFinishedThrift(t *testing.T) {
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-type-id.sum",
 			Dimensions: map[string]string{"env": "production", "container_app": "systemic", "type_id": "2"},
 			Value:      datapoint.NewIntValue(100),
@@ -160,7 +160,7 @@ func TestRollupRequestFinishedThrift(t *testing.T) {
 			Timestamp:  time.Time{},
 			Meta:       map[interface{}]interface{}{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric:     "request-finished-type-id.sumsquare",
 			Dimensions: map[string]string{"env": "production", "container_app": "systemic", "type_id": "2"},
 			Value:      datapoint.NewFloatValue(100),
