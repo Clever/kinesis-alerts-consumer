@@ -3,6 +3,8 @@ include golang.mk
 
 APP_NAME := kinesis-alerts-consumer
 SHELL := /bin/bash
+EXECUTABLE = kinesis-consumer
+PKG = github.com/Clever/kinesis-alerts-consumer
 PKGS := $(shell go list ./... | grep -v /vendor )
 .PHONY: download_jars run build
 $(eval $(call golang-version-check,1.9))
@@ -41,10 +43,8 @@ download_jars:
 
 all: test build
 
-
-
 build:
-	CGO_ENABLED=0 go build -a -installsuffix cgo -o kinesis-consumer
+	$(call golang-build,$(PKG),$(EXECUTABLE))
 
 docker_build: download_jars
 	GOOS=linux GOARCH=amd64 make build

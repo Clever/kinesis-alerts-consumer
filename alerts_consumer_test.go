@@ -8,6 +8,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/signalfx/golib/datapoint"
+	"github.com/signalfx/golib/event"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,12 +25,12 @@ func TestProcessMessage(t *testing.T) {
 
 	// Verify the message
 	t.Log("verify the message")
-	pts := []datapoint.Datapoint{}
-	err = json.Unmarshal(msg, &pts)
+	eo := EncodeOutput{}
+	err = json.Unmarshal(msg, &eo)
 	assert.NoError(t, err)
 
-	expectedPts := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	expectedPts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "oauth.login_start",
 			Dimensions: map[string]string{
 				"district":    "ddd",
@@ -44,7 +45,44 @@ func TestProcessMessage(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, expectedPts, pts)
+	assert.Equal(t, expectedPts, eo.Datapoints)
+}
+
+func TestProcessMessageSupportsAppLifecycleEvents(t *testing.T) {
+	consumer := AlertsConsumer{
+		deployEnv: "test-env",
+	}
+	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"title":"app_deploying","category":"app_lifecycle"}`
+	msg, tags, err := consumer.ProcessMessage([]byte(rawmsg))
+	assert.NoError(t, err)
+
+	expectedTags := []string{"default"}
+	assert.Equal(t, expectedTags, tags)
+
+	// Verify the message
+	t.Log("verify the message")
+	eo := EncodeOutput{}
+	err = json.Unmarshal(msg, &eo)
+	assert.NoError(t, err)
+
+	expected := EncodeOutput{
+		Datapoints: []*datapoint.Datapoint{},
+		Events: []*event.Event{
+			&event.Event{
+				EventType: "app_lifecycle",
+				Category:  event.USERDEFINED,
+				Dimensions: map[string]string{
+					"container_app": "my-app",
+					"container_env": "production",
+					"title":         "app_deploying",
+				},
+				Properties: map[string]interface{}{},
+				Timestamp:  time.Unix(1502822347, 0).UTC(),
+			},
+		},
+	}
+
+	assert.Equal(t, expected, eo)
 }
 
 // TestEncodeMessage tests the encodeMessage() helper used in ProcessMessage()
@@ -78,8 +116,8 @@ func TestEncodeMessage(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
 
-	expectedPts := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	expectedPts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -93,11 +131,11 @@ func TestEncodeMessage(t *testing.T) {
 		},
 	}
 
-	pts := []datapoint.Datapoint{}
-	err = json.Unmarshal(output, &pts)
+	eo := EncodeOutput{}
+	err = json.Unmarshal(output, &eo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedPts, pts)
+	assert.Equal(t, expectedPts, eo.Datapoints)
 }
 
 func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
@@ -131,8 +169,8 @@ func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
 
-	expectedPts := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	expectedPts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name",
 			Dimensions: map[string]string{
 				"dim_a":     "dim_a_val",
@@ -147,11 +185,11 @@ func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
 		},
 	}
 
-	pts := []datapoint.Datapoint{}
-	err = json.Unmarshal(output, &pts)
+	eo := EncodeOutput{}
+	err = json.Unmarshal(output, &eo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedPts, pts)
+	assert.Equal(t, expectedPts, eo.Datapoints)
 }
 
 func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
@@ -241,8 +279,8 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
 
-	expectedPts := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	expectedPts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -256,12 +294,12 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 		},
 	}
 
-	pts := []datapoint.Datapoint{}
-	err = json.Unmarshal(output, &pts)
+	eo := EncodeOutput{}
+	err = json.Unmarshal(output, &eo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedPts[0].Value, pts[0].Value)
-	assert.Equal(t, expectedPts, pts)
+	assert.Equal(t, expectedPts[0].Value, eo.Datapoints[0].Value)
+	assert.Equal(t, expectedPts, eo.Datapoints)
 }
 
 func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
@@ -302,8 +340,8 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
 
-	expectedPts := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	expectedPts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -315,7 +353,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 			MetricType: datapoint.Gauge,
 			Timestamp:  time.Time{},
 		},
-		datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name-2",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -329,12 +367,12 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 		},
 	}
 
-	pts := []datapoint.Datapoint{}
-	err = json.Unmarshal(output, &pts)
+	eo := EncodeOutput{}
+	err = json.Unmarshal(output, &eo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedPts[0].Value, pts[0].Value)
-	assert.Equal(t, expectedPts, pts)
+	assert.Equal(t, expectedPts[0].Value, eo.Datapoints[0].Value)
+	assert.Equal(t, expectedPts, eo.Datapoints)
 }
 
 func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
@@ -361,20 +399,28 @@ func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
 	assert.Contains(t, err.Error(), "intentionally skipped")
 }
 
-type MockSink struct {
-	pts []datapoint.Datapoint
+type MockHTTPSink struct {
+	pts  []*datapoint.Datapoint
+	evts []*event.Event
 }
 
-func (s *MockSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
+func (s *MockHTTPSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
 	for _, p := range points {
-		s.pts = append(s.pts, *p)
+		s.pts = append(s.pts, p)
+	}
+	return nil
+}
+
+func (s *MockHTTPSink) AddEvents(ctx context.Context, events []*event.Event) (err error) {
+	for _, e := range events {
+		s.evts = append(s.evts, e)
 	}
 	return nil
 }
 
 func TestSendBatch(t *testing.T) {
-	pts := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	pts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -385,7 +431,8 @@ func TestSendBatch(t *testing.T) {
 			Value:      datapoint.NewFloatValue(float64(9.5)),
 			MetricType: datapoint.Gauge,
 			Timestamp:  time.Time{},
-		}, datapoint.Datapoint{
+		},
+		&datapoint.Datapoint{
 			Metric: "series-name-2",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -398,8 +445,8 @@ func TestSendBatch(t *testing.T) {
 			Timestamp:  time.Time{},
 		},
 	}
-	pts2 := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	pts2 := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name-3",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -410,7 +457,8 @@ func TestSendBatch(t *testing.T) {
 			Value:      datapoint.NewFloatValue(float64(9.5)),
 			MetricType: datapoint.Gauge,
 			Timestamp:  time.Time{},
-		}, datapoint.Datapoint{
+		},
+		&datapoint.Datapoint{
 			Metric:     "series-name-4",
 			Dimensions: map[string]string{"dim_a": "dim_a_val"},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -419,15 +467,19 @@ func TestSendBatch(t *testing.T) {
 		},
 	}
 
-	b, err := json.Marshal(pts)
+	b, err := json.Marshal(EncodeOutput{
+		Datapoints: pts,
+	})
 	assert.NoError(t, err)
 	input := [][]byte{b}
 
-	b2, err := json.Marshal(pts2)
+	b2, err := json.Marshal(EncodeOutput{
+		Datapoints: pts2,
+	})
 	assert.NoError(t, err)
 	input2 := [][]byte{b2}
 
-	mockSink := &MockSink{}
+	mockSink := &MockHTTPSink{}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
 	}
@@ -443,8 +495,8 @@ func TestSendBatch(t *testing.T) {
 }
 
 func TestSendBatchWithMultipleEntries(t *testing.T) {
-	pts := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	pts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -455,7 +507,8 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 			Value:      datapoint.NewFloatValue(float64(9.5)),
 			MetricType: datapoint.Gauge,
 			Timestamp:  time.Time{},
-		}, datapoint.Datapoint{
+		},
+		&datapoint.Datapoint{
 			Metric: "series-name-2",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -468,8 +521,8 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 			Timestamp:  time.Time{},
 		},
 	}
-	pts2 := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	pts2 := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name-3",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -480,7 +533,8 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 			Value:      datapoint.NewFloatValue(float64(9.5)),
 			MetricType: datapoint.Gauge,
 			Timestamp:  time.Time{},
-		}, datapoint.Datapoint{
+		},
+		&datapoint.Datapoint{
 			Metric:     "series-name-4",
 			Dimensions: map[string]string{"dim_a": "dim_a_val"},
 			Value:      datapoint.NewFloatValue(float64(9.5)),
@@ -489,15 +543,19 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 		},
 	}
 
-	b, err := json.Marshal(pts)
+	b, err := json.Marshal(EncodeOutput{
+		Datapoints: pts,
+	})
 	assert.NoError(t, err)
 
-	b2, err := json.Marshal(pts2)
+	b2, err := json.Marshal(EncodeOutput{
+		Datapoints: pts2,
+	})
 	assert.NoError(t, err)
 
 	input := [][]byte{b, b2}
 
-	mockSink := &MockSink{}
+	mockSink := &MockHTTPSink{}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
 	}
@@ -511,8 +569,8 @@ func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
 	now := time.Now().UTC()
 	oneMinuteAgo := now.Add(-1 * time.Minute)
 
-	pts := []datapoint.Datapoint{
-		datapoint.Datapoint{
+	pts := []*datapoint.Datapoint{
+		&datapoint.Datapoint{
 			Metric: "series-name",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -523,7 +581,8 @@ func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
 			Value:      datapoint.NewFloatValue(float64(9.5)),
 			MetricType: datapoint.Gauge,
 			Timestamp:  now, // This should be reset to time.Time{}
-		}, datapoint.Datapoint{
+		},
+		&datapoint.Datapoint{
 			Metric: "series-name-2",
 			Dimensions: map[string]string{
 				"dim_a":    "dim_a_val",
@@ -537,11 +596,13 @@ func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
 		},
 	}
 
-	b, err := json.Marshal(pts)
+	b, err := json.Marshal(EncodeOutput{
+		Datapoints: pts,
+	})
 	assert.NoError(t, err)
 	input := [][]byte{b}
 
-	mockSink := &MockSink{}
+	mockSink := &MockHTTPSink{}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
 	}

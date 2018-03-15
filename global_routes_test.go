@@ -226,3 +226,25 @@ func TestWagCircuitBreakerRoutes(t *testing.T) {
 	}
 	assert.Equal(t, expected, routes[0])
 }
+
+func TestAppLifecycleRoutes(t *testing.T) {
+	t.Log("Base case: doesn't route empty log")
+	fields := map[string]interface{}{}
+	routes := appLifecycleRoutes(fields)
+	assert.Equal(t, 0, len(routes))
+
+	t.Log("Routes a log")
+	fields = map[string]interface{}{
+		"category": "app_lifecycle",
+		"title":    "app_deploying",
+	}
+	routes = appLifecycleRoutes(fields)
+	assert.Equal(t, 1, len(routes))
+	expected := decode.AlertRoute{
+		Series:     "app_lifecycle",
+		StatType:   statTypeEvent,
+		Dimensions: []string{"container_app", "container_env", "launched_scope", "title", "user", "version", "team"},
+		RuleName:   "global-app-lifecycle",
+	}
+	assert.Equal(t, expected, routes[0])
+}
