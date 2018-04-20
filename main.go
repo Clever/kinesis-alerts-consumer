@@ -54,6 +54,7 @@ func main() {
 	}
 
 	sfxSink := sfxclient.NewHTTPSink()
+	sfxSink.Client.Timeout = 10 * time.Second
 	sfxSink.AuthToken = getEnv("SFX_API_TOKEN")
 	ac := NewAlertsConsumer(sfxSink, getEnv("DEPLOY_ENV"))
 
