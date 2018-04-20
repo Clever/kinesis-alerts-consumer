@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
@@ -170,6 +171,36 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	return out, []string{"default"}, nil
 }
 
+func (c *AlertsConsumer) sendPoints(pts []*datapoint.Datapoint, retries int) error {
+	err := c.sfxSink.AddDatapoints(context.TODO(), pts)
+	if retries <= 0 || err == nil {
+		return nil
+	}
+
+	if err, ok := err.(net.Error); ok && err.Timeout() {
+		lg.WarnD("retry-send-pts", logger.M{"retries": retries})
+		time.Sleep(1 * time.Second)
+		return c.sendPoints(pts, retries-1)
+	}
+
+	return err
+}
+
+func (c *AlertsConsumer) sendEvents(evts []*event.Event, retries int) error {
+	err := c.sfxSink.AddEvents(context.TODO(), evts)
+	if retries <= 0 || err == nil {
+		return err
+	}
+
+	if err, ok := err.(net.Error); ok && err.Timeout() {
+		lg.WarnD("retry-send-events", logger.M{"retries": retries})
+		time.Sleep(1 * time.Second)
+		return c.sendEvents(evts, retries-1)
+	}
+
+	return err
+}
+
 // SendBatch is called once per batch per tag
 func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	pts := []*datapoint.Datapoint{}
@@ -201,16 +232,20 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 		}
 	}
 
-	if err := c.sfxSink.AddDatapoints(context.TODO(), pts); err != nil {
+	if err := c.sendPoints(pts, 3); err != nil {
 		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
-			return kbc.PartialSendBatchError{ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch}
+			return kbc.PartialSendBatchError{
+				ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch,
+			}
 		}
 		return err
 	}
 
-	if err := c.sfxSink.AddEvents(context.TODO(), evts); err != nil {
+	if err := c.sendEvents(evts, 3); err != nil {
 		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
-			return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
+			return kbc.PartialSendBatchError{
+				ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch,
+			}
 		}
 		return err
 	}
