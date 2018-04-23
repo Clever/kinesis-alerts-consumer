@@ -238,6 +238,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 				ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch,
 			}
 		}
+		lg.ErrorD("failed-pts-batch", logger.M{"err": err.Error(), "batch": fmt.Sprintf("+#%v", pts)})
 		return err
 	}
 
@@ -247,6 +248,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 				ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch,
 			}
 		}
+		lg.ErrorD("failed-pts-batch", logger.M{"err": err.Error(), "batch": fmt.Sprintf("+#%v", evts)})
 		return err
 	}
 
