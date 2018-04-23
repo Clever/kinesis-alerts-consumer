@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/signalfx/golib/datapoint"
@@ -177,13 +176,9 @@ func (c *AlertsConsumer) sendPoints(pts []*datapoint.Datapoint, retries int) err
 		return nil
 	}
 
-	if err, ok := err.(net.Error); ok && err.Timeout() {
-		lg.WarnD("retry-send-pts", logger.M{"retries": retries})
-		time.Sleep(1 * time.Second)
-		return c.sendPoints(pts, retries-1)
-	}
-
-	return err
+	lg.WarnD("retry-send-pts", logger.M{"retries": retries, "err": err.Error()})
+	time.Sleep(1 * time.Second)
+	return c.sendPoints(pts, retries-1)
 }
 
 func (c *AlertsConsumer) sendEvents(evts []*event.Event, retries int) error {
@@ -192,13 +187,9 @@ func (c *AlertsConsumer) sendEvents(evts []*event.Event, retries int) error {
 		return err
 	}
 
-	if err, ok := err.(net.Error); ok && err.Timeout() {
-		lg.WarnD("retry-send-events", logger.M{"retries": retries})
-		time.Sleep(1 * time.Second)
-		return c.sendEvents(evts, retries-1)
-	}
-
-	return err
+	lg.WarnD("retry-send-events", logger.M{"retries": retries, "err": err.Error()})
+	time.Sleep(1 * time.Second)
+	return c.sendEvents(evts, retries-1)
 }
 
 // SendBatch is called once per batch per tag
