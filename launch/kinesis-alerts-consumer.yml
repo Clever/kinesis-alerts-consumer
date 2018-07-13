@@ -10,7 +10,7 @@ env:
 - SFX_API_TOKEN
 resources:
   cpu: 0.2
-  soft_mem_limit: 0.5
+  soft_mem_limit: 1.0
   max_mem: 2.0
 shepherds:
 - "nathan.leiby@clever.com"
