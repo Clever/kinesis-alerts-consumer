@@ -138,13 +138,15 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			if valOk {
 				counterVal = int64(val)
 			}
-			pt = datapoint.New(route.Series, dims, datapoint.NewIntValue(counterVal), datapoint.Counter, timestamp)
+			pt = sfxclient.Cumulative(route.Series, dims, counterVal)
+			pt.Timestamp = timestamp
 		} else if route.StatType == "gauge" {
 			gaugeVal := float64(0)
 			if valOk {
 				gaugeVal = val
 			}
-			pt = datapoint.New(route.Series, dims, datapoint.NewFloatValue(gaugeVal), datapoint.Gauge, timestamp)
+			pt = sfxclient.GaugeF(route.Series, dims, gaugeVal)
+			pt.Timestamp = timestamp
 		} else if route.StatType == "event" {
 			// Custom Stat type NOT supported by Kayvee routing
 			// Use Case: send app lifecycle events as "events" to SignalFX
