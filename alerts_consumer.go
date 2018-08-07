@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/eapache/go-resiliency/retrier"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/sfxclient"
@@ -192,33 +193,21 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 		}
 	}
 
+	retry := retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+	retry.Run(func() error {
+		lg.TraceD("sfx-add-datapoints", logger.M{"point-count": len(pts)})
+		return c.sfxSink.AddDatapoints(context.Background(), pts)
+	})
 	var err error
-	sleep := 50
-	for retries := 0; retries < 5; retries++ {
-		err = c.sfxSink.AddDatapoints(context.Background(), pts)
-		if err == nil {
-			break // exit retry loop if there are no errors
-		}
-
-		lg.TraceD("sfx-retry-datapoints", logger.M{"retries": retries, "point-count": len(pts)})
-		time.Sleep(time.Duration(sleep) * time.Millisecond)
-		sleep *= 2
-	}
 	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
 		return kbc.PartialSendBatchError{ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch}
 	}
 
-	sleep = 50
-	for retries := 0; retries < 5; retries++ {
-		err = c.sfxSink.AddEvents(context.Background(), evts)
-		if err == nil {
-			break // exit retry loop if there are no errors
-		}
-
-		lg.TraceD("sfx-retry-events", logger.M{"retries": retries, "point-count": len(evts)})
-		time.Sleep(time.Duration(sleep) * time.Millisecond)
-		sleep *= 2
-	}
+	retry = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+	retry.Run(func() error {
+		lg.TraceD("sfx-events", logger.M{"point-count": len(evts)})
+		return c.sfxSink.AddEvents(context.Background(), evts)
+	})
 	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
 		return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
 	}

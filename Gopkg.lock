@@ -26,6 +26,12 @@
   version = "v1.1.0"
 
 [[projects]]
+  name = "github.com/eapache/go-resiliency"
+  packages = ["retrier"]
+  revision = "ea41b0fad31007accc7f806884dcdf3da98b79ce"
+  version = "v1.1.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
@@ -148,6 +154,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e958fda96554a46eeaba8d32261bc6d1ffc96eb7b5ce988ff0f62979eae34cd5"
+  inputs-digest = "324c21adf75f44b1f9033bc4b13dc30af085c2864549ee3748eca7e31278f6eb"
   solver-name = "gps-cdcl"
   solver-version = 1
