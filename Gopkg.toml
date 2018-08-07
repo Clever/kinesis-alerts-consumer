@@ -19,5 +19,9 @@
   name = "golang.org/x/net"
 
 [[constraint]]
-  version = "6.6.0"
+  version = "^6.12.0"
   name = "gopkg.in/Clever/kayvee-go.v6"
+
+[[constraint]]
+  version = "1.1.0"
+  name = "github.com/eapache/go-resiliency"

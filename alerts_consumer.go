@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/eapache/go-resiliency/retrier"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/signalfx/golib/sfxclient"
@@ -25,8 +26,6 @@ var defaultDimensions = []string{"Hostname", "env"}
 type AlertsConsumer struct {
 	sfxSink   httpSinkInterface
 	deployEnv string
-
-	rollups *Rollups
 }
 
 type httpSinkInterface interface {
@@ -35,12 +34,9 @@ type httpSinkInterface interface {
 }
 
 func NewAlertsConsumer(sfxSink httpSinkInterface, deployEnv string) *AlertsConsumer {
-	rollups := NewRollups(sfxSink)
-	go rollups.Run(context.Background())
 	return &AlertsConsumer{
 		sfxSink:   sfxSink,
 		deployEnv: deployEnv,
-		rollups:   rollups,
 	}
 }
 
@@ -52,10 +48,6 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 	fields, err := decode.ParseAndEnhance(string(rawmsg), c.deployEnv)
 	if err != nil {
 		return nil, []string{}, err
-	}
-
-	if err := c.rollups.Process(fields); err != nil {
-		return []byte{}, []string{}, err
 	}
 
 	return c.encodeMessage(fields)
@@ -201,18 +193,23 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 		}
 	}
 
-	if err := c.sfxSink.AddDatapoints(context.TODO(), pts); err != nil {
-		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
-			return kbc.PartialSendBatchError{ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch}
-		}
-		return err
+	retry := retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+	retry.Run(func() error {
+		lg.TraceD("sfx-add-datapoints", logger.M{"point-count": len(pts)})
+		return c.sfxSink.AddDatapoints(context.Background(), pts)
+	})
+	var err error
+	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
+		return kbc.PartialSendBatchError{ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch}
 	}
 
-	if err := c.sfxSink.AddEvents(context.TODO(), evts); err != nil {
-		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
-			return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
-		}
-		return err
+	retry = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+	retry.Run(func() error {
+		lg.TraceD("sfx-events", logger.M{"point-count": len(evts)})
+		return c.sfxSink.AddEvents(context.Background(), evts)
+	})
+	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
+		return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
 	}
 
 	return nil
