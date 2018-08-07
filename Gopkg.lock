@@ -84,10 +84,7 @@
 [[projects]]
   branch = "master"
   name = "github.com/stretchr/testify"
-  packages = [
-    "assert",
-    "require"
-  ]
+  packages = ["assert"]
   revision = "b89eecf5ca5db6d3ba60b237ffe3df7bafb7662f"
 
 [[projects]]
@@ -127,8 +124,8 @@
     "logger",
     "router"
   ]
-  revision = "e1e6fd8184162847c1123645e7058347a2fd3959"
-  version = "v6.10.0"
+  revision = "77f05943b48b0cb82c705ec9e40bed66e7cf79c1"
+  version = "v6.12.0"
 
 [[projects]]
   name = "gopkg.in/logfmt.v0"
@@ -151,6 +148,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "dd0a7ffe7f40753367bba85fdc59151566d4d7053ff54db637d153272d567673"
+  inputs-digest = "e958fda96554a46eeaba8d32261bc6d1ffc96eb7b5ce988ff0f62979eae34cd5"
   solver-name = "gps-cdcl"
   solver-version = 1
