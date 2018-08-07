@@ -106,7 +106,10 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 				case bool:
 					dims[dim] = fmt.Sprintf("%t", t)
 				default:
-					return []byte{}, []string{}, fmt.Errorf("error casting dimension value. rule=%s dim=%s val=%s", route.RuleName, dim, dimVal)
+					return []byte{}, []string{}, fmt.Errorf(
+						"error casting dimension value. rule=%s dim=%s val=%s",
+						route.RuleName, dim, dimVal,
+					)
 				}
 			}
 		}
@@ -123,7 +126,10 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			valInterface, valueFieldExists := fields[route.ValueField]
 			if valueFieldExists {
 				// case (2)
-				return []byte{}, []string{}, fmt.Errorf("value exists but is wrong type. rule=%s value_field=%s value=%s", route.RuleName, route.ValueField, valInterface)
+				return []byte{}, []string{}, fmt.Errorf(
+					"value exists but is wrong type. rule=%s value_field=%s value=%s",
+					route.RuleName, route.ValueField, valInterface,
+				)
 			}
 		}
 
