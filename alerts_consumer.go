@@ -25,8 +25,6 @@ var defaultDimensions = []string{"Hostname", "env"}
 type AlertsConsumer struct {
 	sfxSink   httpSinkInterface
 	deployEnv string
-
-	rollups *Rollups
 }
 
 type httpSinkInterface interface {
@@ -35,12 +33,9 @@ type httpSinkInterface interface {
 }
 
 func NewAlertsConsumer(sfxSink httpSinkInterface, deployEnv string) *AlertsConsumer {
-	rollups := NewRollups(sfxSink)
-	go rollups.Run(context.Background())
 	return &AlertsConsumer{
 		sfxSink:   sfxSink,
 		deployEnv: deployEnv,
-		rollups:   rollups,
 	}
 }
 
@@ -52,10 +47,6 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 	fields, err := decode.ParseAndEnhance(string(rawmsg), c.deployEnv)
 	if err != nil {
 		return nil, []string{}, err
-	}
-
-	if err := c.rollups.Process(fields); err != nil {
-		return []byte{}, []string{}, err
 	}
 
 	return c.encodeMessage(fields)
