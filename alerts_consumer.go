@@ -192,18 +192,35 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 		}
 	}
 
-	if err := c.sfxSink.AddDatapoints(context.TODO(), pts); err != nil {
-		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
-			return kbc.PartialSendBatchError{ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch}
+	var err error
+	sleep := 50
+	for retries := 0; retries < 5; retries++ {
+		err = c.sfxSink.AddDatapoints(context.Background(), pts)
+		if err == nil {
+			break // exit retry loop if there are no errors
 		}
-		return err
+
+		lg.TraceD("sfx-retry-datapoints", logger.M{"retries": retries, "point-count": len(pts)})
+		time.Sleep(time.Duration(sleep) * time.Millisecond)
+		sleep *= 2
+	}
+	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
+		return kbc.PartialSendBatchError{ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch}
 	}
 
-	if err := c.sfxSink.AddEvents(context.TODO(), evts); err != nil {
-		if err.Error() == "invalid status code 400" { // internal buffer full on sfx's side
-			return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
+	sleep = 50
+	for retries := 0; retries < 5; retries++ {
+		err = c.sfxSink.AddEvents(context.Background(), evts)
+		if err == nil {
+			break // exit retry loop if there are no errors
 		}
-		return err
+
+		lg.TraceD("sfx-retry-events", logger.M{"retries": retries, "point-count": len(evts)})
+		time.Sleep(time.Duration(sleep) * time.Millisecond)
+		sleep *= 2
+	}
+	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
+		return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
 	}
 
 	return nil
