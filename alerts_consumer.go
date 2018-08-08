@@ -69,6 +69,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 
 	// Global Routes
 	routes = append(routes, globalRoutes(fields)...)
+	routes = append(routes, globalRoutesWithCustomFields(&fields)...)
 
 	if len(routes) <= 0 {
 		return nil, nil, kbc.ErrMessageIgnored
