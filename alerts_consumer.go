@@ -69,6 +69,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 
 	// Global Routes
 	routes = append(routes, globalRoutes(fields)...)
+	routes = append(routes, globalRoutesWithCustomFields(&fields)...)
 
 	if len(routes) <= 0 {
 		return nil, nil, kbc.ErrMessageIgnored
@@ -106,7 +107,10 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 				case bool:
 					dims[dim] = fmt.Sprintf("%t", t)
 				default:
-					return []byte{}, []string{}, fmt.Errorf("error casting dimension value. rule=%s dim=%s val=%s", route.RuleName, dim, dimVal)
+					return []byte{}, []string{}, fmt.Errorf(
+						"error casting dimension value. rule=%s dim=%s val=%s",
+						route.RuleName, dim, dimVal,
+					)
 				}
 			}
 		}
@@ -123,7 +127,10 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			valInterface, valueFieldExists := fields[route.ValueField]
 			if valueFieldExists {
 				// case (2)
-				return []byte{}, []string{}, fmt.Errorf("value exists but is wrong type. rule=%s value_field=%s value=%s", route.RuleName, route.ValueField, valInterface)
+				return []byte{}, []string{}, fmt.Errorf(
+					"value exists but is wrong type. rule=%s value_field=%s value=%s",
+					route.RuleName, route.ValueField, valInterface,
+				)
 			}
 		}
 
@@ -132,13 +139,15 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			if valOk {
 				counterVal = int64(val)
 			}
-			pt = datapoint.New(route.Series, dims, datapoint.NewIntValue(counterVal), datapoint.Counter, timestamp)
+			pt = sfxclient.Cumulative(route.Series, dims, counterVal)
+			pt.Timestamp = timestamp
 		} else if route.StatType == "gauge" {
 			gaugeVal := float64(0)
 			if valOk {
 				gaugeVal = val
 			}
-			pt = datapoint.New(route.Series, dims, datapoint.NewFloatValue(gaugeVal), datapoint.Gauge, timestamp)
+			pt = sfxclient.GaugeF(route.Series, dims, gaugeVal)
+			pt.Timestamp = timestamp
 		} else if route.StatType == "event" {
 			// Custom Stat type NOT supported by Kayvee routing
 			// Use Case: send app lifecycle events as "events" to SignalFX

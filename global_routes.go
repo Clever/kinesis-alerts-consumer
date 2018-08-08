@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/Clever/amazon-kinesis-client-go/decode"
@@ -26,6 +28,16 @@ func globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	routes = append(routes, gearcmdHeartbeatRoutes(fields)...)
 	routes = append(routes, wagCircuitBreakerRoutes(fields)...)
 	routes = append(routes, appLifecycleRoutes(fields)...)
+
+	return routes
+}
+
+// globalRoutesWithCustomFields some global routes inject custom dimensions by adding values to the
+// fields map
+func globalRoutesWithCustomFields(fields *map[string]interface{}) []decode.AlertRoute {
+	routes := []decode.AlertRoute{}
+
+	routes = append(routes, mongoSlowQueries(fields)...)
 
 	return routes
 }
@@ -305,4 +317,54 @@ func listContains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+var reMongoSlowQuery = regexp.MustCompile(`^\[conn\d+\]\s([a-z]+)\s([^\s]+?)\s.*\s(\d+)ms$`)
+
+func mongoSlowQueries(fields *map[string]interface{}) []decode.AlertRoute {
+	rawlog, ok := (*fields)["rawlog"].(string)
+	if !ok {
+		return []decode.AlertRoute{}
+	}
+
+	matches := reMongoSlowQuery.FindStringSubmatch(rawlog)
+	if len(matches) < 4 {
+		return []decode.AlertRoute{}
+	}
+
+	millis, err := strconv.ParseFloat(matches[3], 64)
+	if err != nil {
+		return []decode.AlertRoute{}
+	}
+
+	(*fields)["operation"] = matches[1]
+	(*fields)["namespace"] = matches[2]
+	(*fields)["is_collscan"] = strings.Contains(rawlog, "COLLSCAN")
+	(*fields)["millis"] = millis
+
+	return []decode.AlertRoute{
+		decode.AlertRoute{
+			Series: "mongo.slow-query",
+			Dimensions: []string{
+				"hostname",
+				"operation",
+				"namespace",
+				"is_collscan",
+			},
+			StatType: statTypeCounter,
+			RuleName: "global-mongo-slow-query-count",
+		},
+		decode.AlertRoute{
+			Series: "mongo.slow-query-millis",
+			Dimensions: []string{
+				"hostname",
+				"operation",
+				"namespace",
+				"is_collscan",
+			},
+			StatType:   statTypeGauge,
+			ValueField: "millis",
+			RuleName:   "global-mongo-slow-query-gauge",
+		},
+	}
 }
