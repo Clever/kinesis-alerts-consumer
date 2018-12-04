@@ -64,6 +64,9 @@ func processMetricsRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	if !ok {
 		return []decode.AlertRoute{}
 	}
+	if statType == "guage" {
+		statType = "gauge" // Here to fix typo in library
+	}
 
 	return []decode.AlertRoute{
 		decode.AlertRoute{
