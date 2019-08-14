@@ -5,11 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 func TestProcessMessage(t *testing.T) {
@@ -78,6 +80,62 @@ func TestProcessMessageSupportsAppLifecycleEvents(t *testing.T) {
 				},
 				Properties: map[string]interface{}{},
 				Timestamp:  time.Unix(1502822347, 0).UTC(),
+			},
+		},
+		MetricData: []*cloudwatch.MetricDatum{},
+	}
+
+	assert.Equal(t, expected, eo)
+}
+
+func TestProcessMessageSupportsCloudwatch(t *testing.T) {
+	consumer := AlertsConsumer{
+		deployEnv: "test-env",
+	}
+	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"_kvmeta":{"kv_language":"go","kv_version":"6.16.0","routes":[{"dimensions":["cloudwatch-namespace"],"rule":"unexpected-stop","series":"ContainerCrashCount","stat_type":"counter","type":"alerts","value_field":"value"}],"team":"eng-infra"},"category":"app_lifecycle","level":"info","title":"title","region":"reg","type":"counter","value":1}`
+	msg, tags, err := consumer.ProcessMessage([]byte(rawmsg))
+	assert.NoError(t, err)
+
+	expectedTags := []string{"reg"}
+	assert.Equal(t, expectedTags, tags)
+
+	// Verify the message
+	t.Log("verify the message")
+	eo := EncodeOutput{}
+	err = json.Unmarshal(msg, &eo)
+	assert.NoError(t, err)
+
+	timestamp, _ := time.Parse(time.RFC3339Nano, "2017-08-15T18:39:07.000000Z")
+	expected := EncodeOutput{
+		Datapoints: []*datapoint.Datapoint{
+			&datapoint.Datapoint{
+				Metric: "ContainerCrashCount",
+				Dimensions: map[string]string{
+					"Hostname": "my-hostname",
+					"env":      "test-env",
+				},
+				Value:      datapoint.NewIntValue(1),
+				MetricType: datapoint.Counter,
+				Timestamp:  timestamp,
+			},
+		},
+		Events: []*event.Event{},
+		MetricData: []*cloudwatch.MetricDatum{
+			&cloudwatch.MetricDatum{
+				Dimensions: []*cloudwatch.Dimension{
+					&cloudwatch.Dimension{
+						Name:  aws.String("Hostname"),
+						Value: aws.String("my-hostname"),
+					},
+					&cloudwatch.Dimension{
+						Name:  aws.String("env"),
+						Value: aws.String("test-env"),
+					},
+				},
+				MetricName:        aws.String("ContainerCrashCount"),
+				Timestamp:         aws.Time(timestamp),
+				Value:             aws.Float64(1),
+				StorageResolution: aws.Int64(1),
 			},
 		},
 	}
@@ -418,6 +476,16 @@ func (s *MockHTTPSink) AddEvents(ctx context.Context, events []*event.Event) (er
 	return nil
 }
 
+type MockCW struct {
+	cloudwatchiface.CloudWatchAPI
+	inputs []*cloudwatch.PutMetricDataInput
+}
+
+func (cw *MockCW) PutMetricData(input *cloudwatch.PutMetricDataInput) (*cloudwatch.PutMetricDataOutput, error) {
+	cw.inputs = append(cw.inputs, input)
+	return nil, nil
+}
+
 func TestSendBatch(t *testing.T) {
 	pts := []*datapoint.Datapoint{
 		&datapoint.Datapoint{
@@ -480,8 +548,13 @@ func TestSendBatch(t *testing.T) {
 	input2 := [][]byte{b2}
 
 	mockSink := &MockHTTPSink{}
+	mockCWUSWest1 := &MockCW{}
+	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+		"us-west-1": mockCWUSWest1,
+	}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
+		cwAPIs:  mockCWs,
 	}
 	t.Log("Send first batch")
 	err = consumer.SendBatch(input, "default")
@@ -492,6 +565,95 @@ func TestSendBatch(t *testing.T) {
 	err = consumer.SendBatch(input2, "default")
 	assert.NoError(t, err)
 	assert.Equal(t, append(pts, pts2...), mockSink.pts)
+}
+
+func TestSendBatchToCloudwatch(t *testing.T) {
+	dats := []*cloudwatch.MetricDatum{
+		&cloudwatch.MetricDatum{
+			Dimensions: []*cloudwatch.Dimension{
+				&cloudwatch.Dimension{
+					Name:  aws.String("Hostname"),
+					Value: aws.String("my-hostname"),
+				},
+				&cloudwatch.Dimension{
+					Name:  aws.String("env"),
+					Value: aws.String("test-env"),
+				},
+			},
+			MetricName: aws.String("series-1"),
+			Value:      aws.Float64(1),
+		},
+		&cloudwatch.MetricDatum{
+			Dimensions: []*cloudwatch.Dimension{
+				&cloudwatch.Dimension{
+					Name:  aws.String("Hostname"),
+					Value: aws.String("my-hostname"),
+				},
+				&cloudwatch.Dimension{
+					Name:  aws.String("env"),
+					Value: aws.String("test-env"),
+				},
+			},
+			MetricName: aws.String("series-2"),
+			Value:      aws.Float64(1),
+		},
+	}
+
+	expected := []*cloudwatch.PutMetricDataInput{
+		&cloudwatch.PutMetricDataInput{
+			Namespace: aws.String("LogMetrics"),
+			MetricData: []*cloudwatch.MetricDatum{
+				&cloudwatch.MetricDatum{
+					Dimensions: []*cloudwatch.Dimension{
+						&cloudwatch.Dimension{
+							Name:  aws.String("Hostname"),
+							Value: aws.String("my-hostname"),
+						},
+						&cloudwatch.Dimension{
+							Name:  aws.String("env"),
+							Value: aws.String("test-env"),
+						},
+					},
+					MetricName: aws.String("series-1"),
+					Value:      aws.Float64(1),
+				},
+				&cloudwatch.MetricDatum{
+					Dimensions: []*cloudwatch.Dimension{
+						&cloudwatch.Dimension{
+							Name:  aws.String("Hostname"),
+							Value: aws.String("my-hostname"),
+						},
+						&cloudwatch.Dimension{
+							Name:  aws.String("env"),
+							Value: aws.String("test-env"),
+						},
+					},
+					MetricName: aws.String("series-2"),
+					Value:      aws.Float64(1),
+				},
+			},
+		},
+	}
+
+	b, err := json.Marshal(EncodeOutput{
+		MetricData: dats,
+	})
+	assert.NoError(t, err)
+	input := [][]byte{b}
+
+	mockSink := &MockHTTPSink{}
+	mockCWUSWest1 := &MockCW{}
+	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+		"us-west-1": mockCWUSWest1,
+	}
+	consumer := AlertsConsumer{
+		sfxSink: mockSink,
+		cwAPIs:  mockCWs,
+	}
+	t.Log("Send batch")
+	err = consumer.SendBatch(input, "us-west-1")
+	assert.NoError(t, err)
+	assert.Equal(t, expected, mockCWUSWest1.inputs)
 }
 
 func TestSendBatchWithMultipleEntries(t *testing.T) {
@@ -556,8 +718,13 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 	input := [][]byte{b, b2}
 
 	mockSink := &MockHTTPSink{}
+	mockCWUSWest1 := MockCW{}
+	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+		"us-west-1": &mockCWUSWest1,
+	}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
+		cwAPIs:  mockCWs,
 	}
 	t.Log("Send batch with multiple entries")
 	err = consumer.SendBatch(input, "default")
@@ -603,8 +770,13 @@ func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
 	input := [][]byte{b}
 
 	mockSink := &MockHTTPSink{}
+	mockCWUSWest1 := MockCW{}
+	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+		"us-west-1": &mockCWUSWest1,
+	}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
+		cwAPIs:  mockCWs,
 	}
 	t.Log("Send first batch")
 	err = consumer.SendBatch(input, "default")

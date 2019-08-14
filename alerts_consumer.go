@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
 	"github.com/eapache/go-resiliency/retrier"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
@@ -19,6 +22,8 @@ import (
 var lg = logger.New("kinesis-alerts-consumer")
 var sfxSink *sfxclient.HTTPSink
 
+const cloudwatchNamespace = "LogMetrics"
+
 var defaultDimensions = []string{"Hostname", "env"}
 
 // AlertsConsumer sends datapoints to SignalFX
@@ -26,6 +31,7 @@ var defaultDimensions = []string{"Hostname", "env"}
 type AlertsConsumer struct {
 	sfxSink   httpSinkInterface
 	deployEnv string
+	cwAPIs    map[string]cloudwatchiface.CloudWatchAPI
 }
 
 type httpSinkInterface interface {
@@ -33,12 +39,16 @@ type httpSinkInterface interface {
 	AddEvents(context.Context, []*event.Event) error
 }
 
-func NewAlertsConsumer(sfxSink httpSinkInterface, deployEnv string) *AlertsConsumer {
+func NewAlertsConsumer(sfxSink httpSinkInterface, deployEnv string, cwAPIs map[string]cloudwatchiface.CloudWatchAPI) *AlertsConsumer {
 	return &AlertsConsumer{
 		sfxSink:   sfxSink,
 		deployEnv: deployEnv,
+		cwAPIs:    cwAPIs,
 	}
 }
+
+// Initialize - we don't currently need to do any custom initialization
+func (c *AlertsConsumer) Initialize(shardID string) {}
 
 // ProcessMessage is called once per log to parse the log line and then reformat it
 // so that it can be directly used by the output. The returned tags will be passed along
@@ -56,6 +66,7 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 type EncodeOutput struct {
 	Datapoints []*datapoint.Datapoint
 	Events     []*event.Event
+	MetricData []*cloudwatch.MetricDatum
 }
 
 func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, []string, error) {
@@ -90,22 +101,42 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	eo := EncodeOutput{
 		Datapoints: []*datapoint.Datapoint{},
 		Events:     []*event.Event{},
+		MetricData: []*cloudwatch.MetricDatum{},
 	}
+
+	// This is set to an AWS region if any of the routes are for metrics that are whitelisted for CloudWatch.
+	// It is used to set a tag to group data points together before pushing to CloudWatch.
+	tag := "default"
 
 	for _, route := range routes {
 		// Look up dimensions (custom + default)
 		dims := map[string]string{}
+		cwDims := []*cloudwatch.Dimension{}
 		for _, dim := range route.Dimensions {
 			dimVal, ok := fields[dim]
 			if ok {
 				switch t := dimVal.(type) {
 				case string:
 					dims[dim] = t
+					cwDims = append(cwDims, &cloudwatch.Dimension{
+						Name:  aws.String(dim),
+						Value: &t,
+					})
 				case float64:
 					// Drop data after the decimal and cast to string (ex. 3.2 => "3")
-					dims[dim] = fmt.Sprintf("%.0f", t)
+					val := fmt.Sprintf("%.0f", t)
+					dims[dim] = val
+					cwDims = append(cwDims, &cloudwatch.Dimension{
+						Name:  aws.String(dim),
+						Value: &val,
+					})
 				case bool:
-					dims[dim] = fmt.Sprintf("%t", t)
+					val := fmt.Sprintf("%t", t)
+					dims[dim] = val
+					cwDims = append(cwDims, &cloudwatch.Dimension{
+						Name:  aws.String(dim),
+						Value: &val,
+					})
 				default:
 					return []byte{}, []string{}, fmt.Errorf(
 						"error casting dimension value. rule=%s dim=%s val=%s",
@@ -115,8 +146,11 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			}
 		}
 
+		cwWhitelisted, _ := cloudwatchWhitelist[route.Series]
+
 		var pt *datapoint.Datapoint
 		var evt *event.Event
+		var dat *cloudwatch.MetricDatum
 
 		// 3 cases
 		// 	(1) val exists and it's a float
@@ -141,6 +175,15 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			}
 			pt = sfxclient.Cumulative(route.Series, dims, counterVal)
 			pt.Timestamp = timestamp
+			if cwWhitelisted {
+				dat = &cloudwatch.MetricDatum{
+					MetricName:        &route.Series,
+					Dimensions:        cwDims,
+					Value:             aws.Float64(float64(counterVal)),
+					Timestamp:         &timestamp,
+					StorageResolution: aws.Int64(1),
+				}
+			}
 		} else if route.StatType == "gauge" {
 			gaugeVal := float64(0)
 			if valOk {
@@ -148,6 +191,15 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			}
 			pt = sfxclient.GaugeF(route.Series, dims, gaugeVal)
 			pt.Timestamp = timestamp
+			if cwWhitelisted {
+				dat = &cloudwatch.MetricDatum{
+					MetricName:        &route.Series,
+					Dimensions:        cwDims,
+					Value:             &gaugeVal,
+					Timestamp:         &timestamp,
+					StorageResolution: aws.Int64(1),
+				}
+			}
 		} else if route.StatType == "event" {
 			// Custom Stat type NOT supported by Kayvee routing
 			// Use Case: send app lifecycle events as "events" to SignalFX
@@ -161,6 +213,17 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 		} else if evt != nil {
 			eo.Events = append(eo.Events, evt)
 		}
+		if dat != nil {
+			if region, ok := fields["region"].(string); ok {
+				tag = region
+				eo.MetricData = append(eo.MetricData, dat)
+			} else if podRegion, ok := fields["pod-region"].(string); ok {
+				tag = podRegion
+				eo.MetricData = append(eo.MetricData, dat)
+			} else {
+				lg.Error("region-missing")
+			}
+		}
 	}
 
 	out, err := json.Marshal(&eo)
@@ -168,13 +231,15 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 		return []byte{}, []string{}, err
 	}
 
-	return out, []string{"default"}, nil
+	return out, []string{tag}, nil
 }
 
 // SendBatch is called once per batch per tag
+// The tags should always be either "default" or an AWS region (e.g. "us-west-1")
 func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	pts := []*datapoint.Datapoint{}
 	evts := []*event.Event{}
+	dats := []*cloudwatch.MetricDatum{}
 	for _, b := range batch {
 		eo := EncodeOutput{}
 		err := json.Unmarshal(b, &eo)
@@ -184,6 +249,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 
 		pts = append(pts, eo.Datapoints...)
 		evts = append(evts, eo.Events...)
+		dats = append(dats, eo.MetricData...)
 	}
 
 	for idx := range pts {
@@ -219,6 +285,20 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	})
 	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
 		return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
+	}
+
+	// only send to Cloudwatch if the tag is an AWS region
+	if tag == "us-west-1" || tag == "us-west-2" || tag == "us-east-1" || tag == "us-east-2" {
+		lg.TraceD("cloudwatch-add-datapoints", logger.M{"point-count": len(dats)})
+		cw, _ := c.cwAPIs[tag]
+		_, err = cw.PutMetricData(&cloudwatch.PutMetricDataInput{
+			Namespace:  aws.String(cloudwatchNamespace),
+			MetricData: dats,
+		})
+		// TODO: We could return that we failed to process this batch (as above) but for now just log
+		if err != nil {
+			lg.ErrorD("error-sending-to-cloudwatch", logger.M{"error": err.Error()})
+		}
 	}
 
 	return nil
