@@ -202,18 +202,18 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 		}
 	}
 
+	var err error
 	retry := retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
-	retry.Run(func() error {
+
+	err = retry.Run(func() error {
 		lg.TraceD("sfx-add-datapoints", logger.M{"point-count": len(pts)})
 		return c.sfxSink.AddDatapoints(context.Background(), pts)
 	})
-	var err error
 	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
 		return kbc.PartialSendBatchError{ErrMessage: "failed to add datapoints: " + err.Error(), FailedMessages: batch}
 	}
 
-	retry = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
-	retry.Run(func() error {
+	err = retry.Run(func() error {
 		lg.TraceD("sfx-events", logger.M{"point-count": len(evts)})
 		return c.sfxSink.AddEvents(context.Background(), evts)
 	})
