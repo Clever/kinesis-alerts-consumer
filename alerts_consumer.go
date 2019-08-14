@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
 	"github.com/eapache/go-resiliency/retrier"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
@@ -18,6 +21,8 @@ import (
 
 var lg = logger.New("kinesis-alerts-consumer")
 var sfxSink *sfxclient.HTTPSink
+
+const cloudwatchNamespaceDimension = "cloudwatch-namespace"
 
 var defaultDimensions = []string{"Hostname", "env"}
 
@@ -56,6 +61,7 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 type EncodeOutput struct {
 	Datapoints []*datapoint.Datapoint
 	Events     []*event.Event
+	MetricData []*cloudwatch.PutMetricDataInput
 }
 
 func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, []string, error) {
@@ -90,22 +96,38 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	eo := EncodeOutput{
 		Datapoints: []*datapoint.Datapoint{},
 		Events:     []*event.Event{},
+		MetricData: []*cloudwatch.PutMetricDataInput{},
 	}
 
 	for _, route := range routes {
 		// Look up dimensions (custom + default)
 		dims := map[string]string{}
+		cwDims := []*cloudwatch.Dimension{}
 		for _, dim := range route.Dimensions {
 			dimVal, ok := fields[dim]
 			if ok {
 				switch t := dimVal.(type) {
 				case string:
 					dims[dim] = t
+					cwDims = append(cwDims, &cloudwatch.Dimension{
+						Name:  aws.String(dim),
+						Value: &t,
+					})
 				case float64:
 					// Drop data after the decimal and cast to string (ex. 3.2 => "3")
-					dims[dim] = fmt.Sprintf("%.0f", t)
+					val := fmt.Sprintf("%.0f", t)
+					dims[dim] = val
+					cwDims = append(cwDims, &cloudwatch.Dimension{
+						Name:  aws.String(dim),
+						Value: &val,
+					})
 				case bool:
-					dims[dim] = fmt.Sprintf("%t", t)
+					val := fmt.Sprintf("%t", t)
+					dims[dim] = val
+					cwDims = append(cwDims, &cloudwatch.Dimension{
+						Name:  aws.String(dim),
+						Value: &val,
+					})
 				default:
 					return []byte{}, []string{}, fmt.Errorf(
 						"error casting dimension value. rule=%s dim=%s val=%s",
@@ -115,8 +137,11 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			}
 		}
 
+		cwNamespace, namespaceOk := dims[cloudwatchNamespaceDimension]
+
 		var pt *datapoint.Datapoint
 		var evt *event.Event
+		var dat *cloudwatch.MetricDatum
 
 		// 3 cases
 		// 	(1) val exists and it's a float
@@ -141,6 +166,14 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			}
 			pt = sfxclient.Cumulative(route.Series, dims, counterVal)
 			pt.Timestamp = timestamp
+			if namespaceOk {
+				dat = &cloudwatch.MetricDatum{
+					MetricName: &route.Series,
+					Dimensions: cwDims,
+					Value:      aws.Float64(float64(counterVal)),
+					Timestamp:  &timestamp,
+				}
+			}
 		} else if route.StatType == "gauge" {
 			gaugeVal := float64(0)
 			if valOk {
@@ -148,6 +181,14 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			}
 			pt = sfxclient.GaugeF(route.Series, dims, gaugeVal)
 			pt.Timestamp = timestamp
+			if namespaceOk {
+				dat = &cloudwatch.MetricDatum{
+					MetricName: &route.Series,
+					Dimensions: cwDims,
+					Value:      &gaugeVal,
+					Timestamp:  &timestamp,
+				}
+			}
 		} else if route.StatType == "event" {
 			// Custom Stat type NOT supported by Kayvee routing
 			// Use Case: send app lifecycle events as "events" to SignalFX
@@ -160,6 +201,12 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 			eo.Datapoints = append(eo.Datapoints, pt)
 		} else if evt != nil {
 			eo.Events = append(eo.Events, evt)
+		}
+		if dat != nil {
+			eo.MetricData = append(eo.MetricData, &cloudwatch.PutMetricDataInput{
+				Namespace:  aws.String(cwNamespace),
+				MetricData: []*cloudwatch.MetricDatum{dat},
+			})
 		}
 	}
 

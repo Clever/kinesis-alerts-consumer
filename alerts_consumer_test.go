@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
+	"github.com/Clever/aws-sdk-go-counter/aws"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/signalfx/golib/datapoint"
 	"github.com/signalfx/golib/event"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/context"
 )
 
 func TestProcessMessage(t *testing.T) {
@@ -78,6 +79,71 @@ func TestProcessMessageSupportsAppLifecycleEvents(t *testing.T) {
 				},
 				Properties: map[string]interface{}{},
 				Timestamp:  time.Unix(1502822347, 0).UTC(),
+			},
+		},
+		MetricData: []*cloudwatch.PutMetricDataInput{},
+	}
+
+	assert.Equal(t, expected, eo)
+}
+
+func TestProcessMessageSupportsCloudwatch(t *testing.T) {
+	consumer := AlertsConsumer{
+		deployEnv: "test-env",
+	}
+	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"_kvmeta":{"kv_language":"go","kv_version":"6.16.0","routes":[{"dimensions":["cloudwatch-namespace"],"rule":"unexpected-stop","series":"series-name","stat_type":"counter","type":"alerts","value_field":"value"}],"team":"eng-infra"},"category":"app_lifecycle","cloudwatch-namespace":"namespace","level":"info","title":"homepod-container-stopped","type":"counter","value":1}`
+	msg, tags, err := consumer.ProcessMessage([]byte(rawmsg))
+	assert.NoError(t, err)
+
+	expectedTags := []string{"default"}
+	assert.Equal(t, expectedTags, tags)
+
+	// Verify the message
+	t.Log("verify the message")
+	eo := EncodeOutput{}
+	err = json.Unmarshal(msg, &eo)
+	assert.NoError(t, err)
+
+	timestamp, _ := time.Parse(time.RFC3339Nano, "2017-08-15T18:39:07.000000Z")
+	expected := EncodeOutput{
+		Datapoints: []*datapoint.Datapoint{
+			&datapoint.Datapoint{
+				Metric: "series-name",
+				Dimensions: map[string]string{
+					"cloudwatch-namespace": "namespace",
+					"Hostname":             "my-hostname",
+					"env":                  "test-env",
+				},
+				Value:      datapoint.NewIntValue(1),
+				MetricType: datapoint.Counter,
+				Timestamp:  timestamp,
+			},
+		},
+		Events: []*event.Event{},
+		MetricData: []*cloudwatch.PutMetricDataInput{
+			&cloudwatch.PutMetricDataInput{
+				Namespace: aws.String("namespace"),
+				MetricData: []*cloudwatch.MetricDatum{
+					&cloudwatch.MetricDatum{
+						Dimensions: []*cloudwatch.Dimension{
+							&cloudwatch.Dimension{
+								Name:  aws.String("cloudwatch-namespace"),
+								Value: aws.String("namespace"),
+							},
+							&cloudwatch.Dimension{
+								Name:  aws.String("Hostname"),
+								Value: aws.String("my-hostname"),
+							},
+							&cloudwatch.Dimension{
+								Name:  aws.String("env"),
+								Value: aws.String("test-env"),
+							},
+						},
+						MetricName: aws.String("series-name"),
+						Timestamp:  aws.Time(timestamp),
+						Value:      aws.Float64(1),
+					},
+				},
 			},
 		},
 	}
