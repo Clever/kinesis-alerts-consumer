@@ -31,6 +31,7 @@ var defaultDimensions = []string{"Hostname", "env"}
 type AlertsConsumer struct {
 	sfxSink   httpSinkInterface
 	deployEnv string
+	cwAPI     cloudwatchiface.CloudWatchAPI
 }
 
 type httpSinkInterface interface {
@@ -38,10 +39,11 @@ type httpSinkInterface interface {
 	AddEvents(context.Context, []*event.Event) error
 }
 
-func NewAlertsConsumer(sfxSink httpSinkInterface, deployEnv string) *AlertsConsumer {
+func NewAlertsConsumer(sfxSink httpSinkInterface, deployEnv string, cwAPI cloudwatchiface.CloudWatchAPI) *AlertsConsumer {
 	return &AlertsConsumer{
 		sfxSink:   sfxSink,
 		deployEnv: deployEnv,
+		cwAPI:     cwAPI,
 	}
 }
 
@@ -222,6 +224,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	pts := []*datapoint.Datapoint{}
 	evts := []*event.Event{}
+	dats := []*cloudwatch.PutMetricDataInput{}
 	for _, b := range batch {
 		eo := EncodeOutput{}
 		err := json.Unmarshal(b, &eo)
@@ -231,6 +234,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 
 		pts = append(pts, eo.Datapoints...)
 		evts = append(evts, eo.Events...)
+		dats = append(dats, eo.MetricData...)
 	}
 
 	for idx := range pts {
@@ -266,6 +270,18 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	})
 	if err != nil && err.Error() == "invalid status code 400" { // internal buffer full in sfx
 		return kbc.PartialSendBatchError{ErrMessage: "failed to add events: " + err.Error(), FailedMessages: batch}
+	}
+
+	for _, input := range dats {
+		err = retry.Run(func() error {
+			lg.Trace("cloudwatch-add-datapoints")
+			_, e := c.cwAPI.PutMetricData(input)
+			return e
+		})
+		// TODO: We could return that we failed to process this batch (as above) but for now just log
+		if err != nil {
+			lg.ErrorD("error-sending-to-cloudwatch", logger.M{"error": err.Error()})
+		}
 	}
 
 	return nil

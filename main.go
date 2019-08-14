@@ -7,10 +7,11 @@ import (
 	"strconv"
 	"time"
 
+	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/kardianos/osext"
 	"github.com/signalfx/golib/sfxclient"
-
-	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
 	"gopkg.in/Clever/kayvee-go.v6/logger"
 )
 
@@ -55,7 +56,9 @@ func main() {
 
 	sfxSink := sfxclient.NewHTTPSink()
 	sfxSink.AuthToken = getEnv("SFX_API_TOKEN")
-	ac := NewAlertsConsumer(sfxSink, getEnv("DEPLOY_ENV"))
+
+	cwAPI := cloudwatch.New(session.New())
+	ac := NewAlertsConsumer(sfxSink, getEnv("DEPLOY_ENV"), cwAPI)
 
 	// Track Max Delay
 	go func() {

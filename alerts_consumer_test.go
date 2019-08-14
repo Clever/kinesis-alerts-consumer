@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
+
 	"github.com/Clever/aws-sdk-go-counter/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/signalfx/golib/datapoint"
@@ -484,6 +486,16 @@ func (s *MockHTTPSink) AddEvents(ctx context.Context, events []*event.Event) (er
 	return nil
 }
 
+type MockCW struct {
+	cloudwatchiface.CloudWatchAPI
+	inputs []*cloudwatch.PutMetricDataInput
+}
+
+func (cw *MockCW) PutMetricData(input *cloudwatch.PutMetricDataInput) (*cloudwatch.PutMetricDataOutput, error) {
+	cw.inputs = append(cw.inputs, input)
+	return nil, nil
+}
+
 func TestSendBatch(t *testing.T) {
 	pts := []*datapoint.Datapoint{
 		&datapoint.Datapoint{
@@ -558,6 +570,74 @@ func TestSendBatch(t *testing.T) {
 	err = consumer.SendBatch(input2, "default")
 	assert.NoError(t, err)
 	assert.Equal(t, append(pts, pts2...), mockSink.pts)
+}
+
+func TestSendBatchToCloudwatch(t *testing.T) {
+	dats := []*cloudwatch.PutMetricDataInput{
+		&cloudwatch.PutMetricDataInput{
+			Namespace: aws.String("namespace"),
+			MetricData: []*cloudwatch.MetricDatum{
+				&cloudwatch.MetricDatum{
+					Dimensions: []*cloudwatch.Dimension{
+						&cloudwatch.Dimension{
+							Name:  aws.String("cloudwatch-namespace"),
+							Value: aws.String("namespace"),
+						},
+						&cloudwatch.Dimension{
+							Name:  aws.String("Hostname"),
+							Value: aws.String("my-hostname"),
+						},
+						&cloudwatch.Dimension{
+							Name:  aws.String("env"),
+							Value: aws.String("test-env"),
+						},
+					},
+					MetricName: aws.String("series-name"),
+					Value:      aws.Float64(1),
+				},
+			},
+		},
+		&cloudwatch.PutMetricDataInput{
+			Namespace: aws.String("namespace"),
+			MetricData: []*cloudwatch.MetricDatum{
+				&cloudwatch.MetricDatum{
+					Dimensions: []*cloudwatch.Dimension{
+						&cloudwatch.Dimension{
+							Name:  aws.String("cloudwatch-namespace"),
+							Value: aws.String("namespace"),
+						},
+						&cloudwatch.Dimension{
+							Name:  aws.String("Hostname"),
+							Value: aws.String("my-hostname"),
+						},
+						&cloudwatch.Dimension{
+							Name:  aws.String("env"),
+							Value: aws.String("test-env"),
+						},
+					},
+					MetricName: aws.String("series-name-2"),
+					Value:      aws.Float64(1),
+				},
+			},
+		},
+	}
+
+	b, err := json.Marshal(EncodeOutput{
+		MetricData: dats,
+	})
+	assert.NoError(t, err)
+	input := [][]byte{b}
+
+	mockSink := &MockHTTPSink{}
+	mockCW := &MockCW{}
+	consumer := AlertsConsumer{
+		sfxSink: mockSink,
+		cwAPI:   mockCW,
+	}
+	t.Log("Send batch")
+	err = consumer.SendBatch(input, "default")
+	assert.NoError(t, err)
+	assert.Equal(t, dats, mockCW.inputs)
 }
 
 func TestSendBatchWithMultipleEntries(t *testing.T) {
