@@ -92,7 +92,7 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 	consumer := AlertsConsumer{
 		deployEnv: "test-env",
 	}
-	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"_kvmeta":{"kv_language":"go","kv_version":"6.16.0","routes":[{"dimensions":["cloudwatch-namespace"],"rule":"unexpected-stop","series":"ContainerCrashCount","stat_type":"counter","type":"alerts","value_field":"value"}],"team":"eng-infra"},"category":"app_lifecycle","level":"info","title":"title","region":"reg","type":"counter","value":1}`
+	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"_kvmeta":{"kv_language":"go","kv_version":"6.16.0","routes":[{"dimensions":["cloudwatch-namespace"],"rule":"unexpected-stop","series":"ContainerExitCount","stat_type":"counter","type":"alerts","value_field":"value"}],"team":"eng-infra"},"category":"app_lifecycle","level":"info","title":"title","region":"reg","type":"counter","value":1}`
 	msg, tags, err := consumer.ProcessMessage([]byte(rawmsg))
 	assert.NoError(t, err)
 
@@ -109,7 +109,7 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 	expected := EncodeOutput{
 		Datapoints: []*datapoint.Datapoint{
 			&datapoint.Datapoint{
-				Metric: "ContainerCrashCount",
+				Metric: "ContainerExitCount",
 				Dimensions: map[string]string{
 					"Hostname": "my-hostname",
 					"env":      "test-env",
@@ -132,7 +132,7 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 						Value: aws.String("test-env"),
 					},
 				},
-				MetricName:        aws.String("ContainerCrashCount"),
+				MetricName:        aws.String("ContainerExitCount"),
 				Timestamp:         aws.Time(timestamp),
 				Value:             aws.Float64(1),
 				StorageResolution: aws.Int64(1),
