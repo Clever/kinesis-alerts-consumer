@@ -9,3 +9,12 @@ routes:
       dimensions: [ ]
       value_field: "unknown-error" 
       stat_type: "counter"
+  cloudwatch-errors:
+    matchers:
+      title: ["error-sending-to-cloudwatch"]
+    output:
+      type: "alerts"
+      series: "kinesis-consumer.alerts.cloudwatch-error"
+      dimensions: [ ]
+      stat_type: "counter"
+

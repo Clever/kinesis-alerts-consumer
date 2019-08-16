@@ -7,10 +7,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kardianos/osext"
-	"github.com/signalfx/golib/sfxclient"
+	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
+
+	"github.com/aws/aws-sdk-go/aws"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/kardianos/osext"
+	"github.com/signalfx/golib/sfxclient"
 	"gopkg.in/Clever/kayvee-go.v6/logger"
 )
 
@@ -55,7 +60,14 @@ func main() {
 
 	sfxSink := sfxclient.NewHTTPSink()
 	sfxSink.AuthToken = getEnv("SFX_API_TOKEN")
-	ac := NewAlertsConsumer(sfxSink, getEnv("DEPLOY_ENV"))
+
+	cwAPIs := map[string]cloudwatchiface.CloudWatchAPI{
+		"us-west-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-1")})),
+		"us-west-2": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-2")})),
+		"us-east-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-east-1")})),
+		"us-east-2": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-east-2")})),
+	}
+	ac := NewAlertsConsumer(sfxSink, getEnv("DEPLOY_ENV"), cwAPIs)
 
 	// Track Max Delay
 	go func() {
