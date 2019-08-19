@@ -92,7 +92,7 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 	consumer := AlertsConsumer{
 		deployEnv: "test-env",
 	}
-	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"_kvmeta":{"kv_language":"go","kv_version":"6.16.0","routes":[{"dimensions":["cloudwatch-namespace"],"rule":"unexpected-stop","series":"ContainerExitCount","stat_type":"counter","type":"alerts","value_field":"value"}],"team":"eng-infra"},"category":"app_lifecycle","level":"info","title":"title","region":"reg","type":"counter","value":1}`
+	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"_kvmeta":{"kv_language":"go","kv_version":"6.16.0","routes":[{"dimensions":["dimension1"],"rule":"unexpected-stop","series":"ContainerExitCount","stat_type":"counter","type":"alerts","value_field":"value"}],"team":"eng-infra"},"category":"app_lifecycle","level":"info","title":"title","dimension1":"dim","region":"reg","type":"counter","value":1}`
 	msg, tags, err := consumer.ProcessMessage([]byte(rawmsg))
 	assert.NoError(t, err)
 
@@ -111,8 +111,9 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 			&datapoint.Datapoint{
 				Metric: "ContainerExitCount",
 				Dimensions: map[string]string{
-					"Hostname": "my-hostname",
-					"env":      "test-env",
+					"Hostname":   "my-hostname",
+					"env":        "test-env",
+					"dimension1": "dim",
 				},
 				Value:      datapoint.NewIntValue(1),
 				MetricType: datapoint.Counter,
@@ -124,12 +125,8 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 			&cloudwatch.MetricDatum{
 				Dimensions: []*cloudwatch.Dimension{
 					&cloudwatch.Dimension{
-						Name:  aws.String("Hostname"),
-						Value: aws.String("my-hostname"),
-					},
-					&cloudwatch.Dimension{
-						Name:  aws.String("env"),
-						Value: aws.String("test-env"),
+						Name:  aws.String("dimension1"),
+						Value: aws.String("dim"),
 					},
 				},
 				MetricName:        aws.String("ContainerExitCount"),

@@ -24,7 +24,7 @@ var sfxSink *sfxclient.HTTPSink
 
 const cloudwatchNamespace = "LogMetrics"
 
-var defaultDimensions = []string{"Hostname", "env"}
+var sfxDefaultDimensions = []string{"Hostname", "env"}
 
 // AlertsConsumer sends datapoints to SignalFX
 // It implements the kbc.Sender interface
@@ -69,13 +69,23 @@ type EncodeOutput struct {
 	MetricData []*cloudwatch.MetricDatum
 }
 
+// returns true if s is in the slice
+func contains(slice []string, s string) bool {
+	for _, str := range slice {
+		if str == s {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, []string, error) {
 	// Determine routes
 	// KVMeta Routes
 	kvmeta := decode.ExtractKVMeta(fields)
 	routes := kvmeta.Routes.AlertRoutes()
 	for idx := range routes {
-		routes[idx].Dimensions = append(routes[idx].Dimensions, defaultDimensions...)
+		routes[idx].Dimensions = append(routes[idx].Dimensions, sfxDefaultDimensions...)
 	}
 
 	// Global Routes
@@ -118,10 +128,12 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 				switch t := dimVal.(type) {
 				case string:
 					dims[dim] = t
-					cwDims = append(cwDims, &cloudwatch.Dimension{
-						Name:  aws.String(dim),
-						Value: &t,
-					})
+					if !contains(sfxDefaultDimensions, dim) {
+						cwDims = append(cwDims, &cloudwatch.Dimension{
+							Name:  aws.String(dim),
+							Value: &t,
+						})
+					}
 				case float64:
 					// Drop data after the decimal and cast to string (ex. 3.2 => "3")
 					val := fmt.Sprintf("%.0f", t)
