@@ -23,7 +23,7 @@
   name = "gopkg.in/Clever/kayvee-go.v6"
 
 [[constraint]]
-  version = "1.1.0"
+  version = "1.2.0"
   name = "github.com/eapache/go-resiliency"
 
 [[constraint]]
