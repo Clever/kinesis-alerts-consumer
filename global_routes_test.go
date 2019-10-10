@@ -364,3 +364,43 @@ func TestMongoSlowQueries(t *testing.T) {
 		assert.Equal(test.is_collscan, fields["is_collscan"])
 	}
 }
+
+func TestRDSSlowQueries(t *testing.T) {
+	t.Log("Base case: doesn't route empty log")
+	fields := map[string]interface{}{}
+	routes := rdsSlowQueries(fields)
+	assert.Equal(t, 0, len(routes))
+
+	t.Log("rdsadmin slowquery: doesn't route slowquery log by rdsadmin")
+	fields = map[string]interface{}{
+		"rawlog": `# Time: 190921 16:02:59
+		# User@Host: rdsadmin[rdsadmin] @ localhost []  Id:     1
+		# Query_time: 22.741550  Lock_time: 0.000000 Rows_sent: 0  Rows_examined: 0SET timestamp=1569081779;call action start_seamless_scaling('AQEAAB1P/PAIqvTHEQFJAEkojZUoH176FGJttZ62JF5QmRehaf0S0VFTa+5MPJdYQ9k0/sekBlnMi8U=', 300000, 2);
+		SET timestamp=1569862702;
+		INSERT INTO library.section_students (district_id,section_id,student_id,create_date,last_modified) VALUES ('55df7cc8e571c801000007ca','5d41ab6911d20e011822618f','5bad2c48bc3a223d8b1f0a42','2019-09-30T16:58:22Z','2019-09-30T16:58:22Z'), ('55df7cc8e571c801000007ca','5d31b28ab1666804693d3026','5d7c05d51aa571027b97ffbd','2019-09-30T16:58:22Z','2019-09-30T16:58:22Z'),`,
+		"hostname": "aws-rds",
+		"user":     "rdsadmin[rdsadmin]",
+	}
+	routes = rdsSlowQueries(fields)
+	assert.Equal(t, 0, len(routes))
+
+	t.Log("Routes a log")
+	fields = map[string]interface{}{
+		"rawlog": `# Time: 191009 20:19:43
+			# User@Host: clever[clever] @ [10.1.1.213] Id: 13830
+			# Query_time: 0.882220 Lock_time: 0.003195 Rows_sent: 0 Rows_examined: 0
+			SET timestamp=1570652383;
+			INSERT INTO library.section_students (district_id,section_id,student_id,create_date,last_modified) VALUES ('52ea78f3fa9ddfad0d000248','5d5ef6a282f17c0091929c83','56e9cc6b51c4cf115101018e','2019-10-09T20:19:42Z','2019-10-09T20:19:42Z'), ('52ea78f3fa9ddfad0d000248','5d55796801d9fb067557427d','59b96879d3c863b211010748','2019-10-09T20:19:42Z','2019-10-09T20:19:42Z'),`,
+		"hostname": "aws-rds",
+		"user":     "clever[clever]",
+	}
+	routes = rdsSlowQueries(fields)
+	assert.Equal(t, 1, len(routes))
+	expected := decode.AlertRoute{
+		Series:     "rds.slow-query",
+		Dimensions: []string{},
+		StatType:   statTypeCounter,
+		RuleName:   "global-rds-slow-query-count",
+	}
+	assert.Equal(t, expected, routes[0])
+}
