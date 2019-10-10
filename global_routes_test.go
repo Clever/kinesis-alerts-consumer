@@ -1,252 +1,410 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/Clever/amazon-kinesis-client-go/decode"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestProcessMetricsRoutes(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := processMetricsRoutes(fields)
-	assert.Equal(t, 0, len(routes))
+func Test_processMetricsRoutes(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
 
-	t.Log("Routes a log - counter")
-	fields = map[string]interface{}{
-		"via":    "process-metrics",
-		"source": "some-source",
-		"title":  "some-title",
-		"value":  123,
-		"type":   "counter",
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log - counter",
+			args: args{
+				fields: map[string]interface{}{
+					"via":    "process-metrics",
+					"source": "some-source",
+					"title":  "some-title",
+					"value":  123,
+					"type":   "counter",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "process-metrics.some-title",
+				StatType:   statTypeCounter,
+				Dimensions: []string{"Hostname", "env", "source"},
+				ValueField: defaultValueField,
+				RuleName:   "global-process-metrics",
+			}},
+		},
+		{
+			name: "Routes a log - gauge",
+			args: args{
+				fields: map[string]interface{}{
+					"via":    "process-metrics",
+					"source": "some-source-2",
+					"title":  "some-title-2",
+					"value":  .35,
+					"type":   "gauge",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "process-metrics.some-title-2",
+				StatType:   statTypeGauge,
+				Dimensions: []string{"Hostname", "env", "source"},
+				ValueField: defaultValueField,
+				RuleName:   "global-process-metrics",
+			}},
+		},
 	}
-	routes = processMetricsRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "process-metrics.some-title",
-		StatType:   statTypeCounter,
-		Dimensions: []string{"Hostname", "env", "source"},
-		ValueField: defaultValueField,
-		RuleName:   "global-process-metrics",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := processMetricsRoutes(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("processMetricsRoutes() = %v, want %v", got, tt.want)
+			}
+		})
 	}
-	assert.Equal(t, expected, routes[0])
-
-	t.Log("Routes a log - gauge")
-	fields = map[string]interface{}{
-		"via":    "process-metrics",
-		"source": "some-source-2",
-		"title":  "some-title-2",
-		"value":  .35,
-		"type":   "gauge",
-	}
-	routes = processMetricsRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected = decode.AlertRoute{
-		Series:     "process-metrics.some-title-2",
-		StatType:   statTypeGauge,
-		Dimensions: []string{"Hostname", "env", "source"},
-		ValueField: defaultValueField,
-		RuleName:   "global-process-metrics",
-	}
-	assert.Equal(t, expected, routes[0])
 }
 
-func TestRsyslogRateLimitRoutes(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := rsyslogRateLimitRoutes(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("Routes a log")
-	fields = map[string]interface{}{
-		"programname": "prefix..rsyslog..postfix",
-		"rawlog":      "prefix..imuxsock begins to drop messages..postfix",
+func Test_rsyslogRateLimitRoutes(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
 	}
-	routes = rsyslogRateLimitRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "rsyslog.rate-limit-triggered",
-		StatType:   statTypeCounter,
-		Dimensions: []string{"Hostname", "env"},
-		ValueField: defaultValueField,
-		RuleName:   "global-rsyslog-rate-limit",
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log",
+			args: args{
+				fields: map[string]interface{}{
+					"programname": "prefix..rsyslog..postfix",
+					"rawlog":      "prefix..imuxsock begins to drop messages..postfix",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "rsyslog.rate-limit-triggered",
+				StatType:   statTypeCounter,
+				Dimensions: []string{"Hostname", "env"},
+				ValueField: defaultValueField,
+				RuleName:   "global-rsyslog-rate-limit",
+			}},
+		},
 	}
-	assert.Equal(t, expected, routes[0])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rsyslogRateLimitRoutes(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("rsyslogRateLimitRoutes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
-func TestGearmanRoutes(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := gearmanRoutes(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("Routes a log - gearman success")
-	fields = map[string]interface{}{
-		"source": "gearman",
-		"title":  "success",
-		"env":    "production",
+func Test_gearmanRoutes(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
 	}
-	routes = gearmanRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "gearman.success",
-		StatType:   statTypeCounter,
-		Dimensions: []string{"Hostname", "function"},
-		ValueField: defaultValueField,
-		RuleName:   "global-gearman",
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log - gearman success",
+			args: args{
+				fields: map[string]interface{}{
+					"source": "gearman",
+					"title":  "success",
+					"env":    "production",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "gearman.success",
+				StatType:   statTypeCounter,
+				Dimensions: []string{"Hostname", "function"},
+				ValueField: defaultValueField,
+				RuleName:   "global-gearman",
+			}},
+		},
+		{
+			name: "Routes a log - gearman failure",
+			args: args{
+				fields: map[string]interface{}{
+					"source": "gearman",
+					"title":  "failure",
+					"env":    "production",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "gearman.failure",
+				StatType:   statTypeCounter,
+				Dimensions: []string{"Hostname", "function"},
+				ValueField: defaultValueField,
+				RuleName:   "global-gearman",
+			}},
+		},
+		{
+			name: "Routes a log only if env==production",
+			args: args{
+				fields: map[string]interface{}{
+					"source": "gearman",
+					"title":  "success",
+					"env":    "dev",
+				},
+			},
+			want: []decode.AlertRoute{},
+		},
 	}
-	assert.Equal(t, expected, routes[0])
-
-	t.Log("Routes a log - gearman failure")
-	fields = map[string]interface{}{
-		"source": "gearman",
-		"title":  "failure",
-		"env":    "production",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := gearmanRoutes(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("gearmanRoutes() = %v, want %v", got, tt.want)
+			}
+		})
 	}
-	routes = gearmanRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected = decode.AlertRoute{
-		Series:     "gearman.failure",
-		StatType:   statTypeCounter,
-		Dimensions: []string{"Hostname", "function"},
-		ValueField: defaultValueField,
-		RuleName:   "global-gearman",
-	}
-	assert.Equal(t, expected, routes[0])
-
-	t.Log("Routes a log only if env==production")
-	fields = map[string]interface{}{
-		"source": "gearman",
-		"title":  "success",
-		"env":    "dev",
-	}
-	routes = gearmanRoutes(fields)
-	assert.Equal(t, 0, len(routes))
 }
 
-func TestGearcmdPassfailRoutes(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := gearcmdPassfailRoutes(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("Routes a log - gearcmd END")
-	fields = map[string]interface{}{
-		"source": "gearcmd",
-		"title":  "END",
-		"env":    "production",
+func Test_gearcmdPassfailRoutes(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
 	}
-	routes = gearcmdPassfailRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "gearcmd.passfail",
-		StatType:   statTypeGauge,
-		Dimensions: []string{"Hostname", "function"},
-		ValueField: defaultValueField,
-		RuleName:   "global-gearcmd-passfail",
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log - gearcmd END",
+			args: args{
+				fields: map[string]interface{}{
+					"source": "gearcmd",
+					"title":  "END",
+					"env":    "production",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "gearcmd.passfail",
+				StatType:   statTypeGauge,
+				Dimensions: []string{"Hostname", "function"},
+				ValueField: defaultValueField,
+				RuleName:   "global-gearcmd-passfail",
+			}},
+		},
+		{
+			name: "Routes a log only if env==production",
+			args: args{
+				fields: map[string]interface{}{
+					"source": "gearcmd",
+					"title":  "END",
+					"env":    "dev",
+				},
+			},
+			want: []decode.AlertRoute{},
+		},
 	}
-	assert.Equal(t, expected, routes[0])
-
-	t.Log("Routes a log only if env==production")
-	fields = map[string]interface{}{
-		"source": "gearcmd",
-		"title":  "END",
-		"env":    "dev",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := gearcmdPassfailRoutes(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("gearcmdPassfailRoutes() = %v, want %v", got, tt.want)
+			}
+		})
 	}
-	routes = gearcmdPassfailRoutes(fields)
-	assert.Equal(t, 0, len(routes))
 }
 
-func TestGearcmdDurationRoutes(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := gearcmdDurationRoutes(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("Routes a log - gearcmd duration")
-	fields = map[string]interface{}{
-		"source": "gearcmd",
-		"title":  "duration",
+func Test_gearcmdDurationRoutes(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
 	}
-	routes = gearcmdDurationRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "gearcmd.duration",
-		StatType:   statTypeGauge,
-		Dimensions: []string{"Hostname", "function", "env"},
-		ValueField: defaultValueField,
-		RuleName:   "global-gearcmd-duration",
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log - gearcmd duration",
+			args: args{
+				fields: map[string]interface{}{
+					"source": "gearcmd",
+					"title":  "duration",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "gearcmd.duration",
+				StatType:   statTypeGauge,
+				Dimensions: []string{"Hostname", "function", "env"},
+				ValueField: defaultValueField,
+				RuleName:   "global-gearcmd-duration",
+			}},
+		},
 	}
-	assert.Equal(t, expected, routes[0])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := gearcmdDurationRoutes(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("gearcmdDurationRoutes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
-func TestGearcmdHeartbeatRoutes(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := gearcmdHeartbeatRoutes(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("Routes a log - gearcmd hearbeat")
-	fields = map[string]interface{}{
-		"source": "gearcmd",
-		"title":  "heartbeat",
+func Test_gearcmdHeartbeatRoutes(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
 	}
-	routes = gearcmdHeartbeatRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "gearcmd.heartbeat",
-		StatType:   statTypeGauge,
-		Dimensions: []string{"Hostname", "env", "function", "job_id", "try_number", "unit"},
-		ValueField: defaultValueField,
-		RuleName:   "global-gearcmd-heartbeat",
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log - gearcmd hearbeat",
+			args: args{
+				fields: map[string]interface{}{
+					"source": "gearcmd",
+					"title":  "heartbeat",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "gearcmd.heartbeat",
+				StatType:   statTypeGauge,
+				Dimensions: []string{"Hostname", "env", "function", "job_id", "try_number", "unit"},
+				ValueField: defaultValueField,
+				RuleName:   "global-gearcmd-heartbeat",
+			}},
+		},
 	}
-	assert.Equal(t, expected, routes[0])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := gearcmdHeartbeatRoutes(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("gearcmdHeartbeatRoutes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
-func TestWagCircuitBreakerRoutes(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := wagCircuitBreakerRoutes(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("Routes a log")
-	fields = map[string]interface{}{
-		"source":          "prefix..wagclient..postfix",
-		"errorPercentage": float64(.13),
+func Test_wagCircuitBreakerRoutes(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
 	}
-	routes = wagCircuitBreakerRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "wag.client-circuit-breakers",
-		StatType:   statTypeGauge,
-		Dimensions: []string{"container_env", "container_app", "title"},
-		ValueField: "errorPercentage",
-		RuleName:   "global-wag-circuit-breakers",
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log",
+			args: args{
+				fields: map[string]interface{}{
+					"source":          "prefix..wagclient..postfix",
+					"errorPercentage": float64(.13),
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "wag.client-circuit-breakers",
+				StatType:   statTypeGauge,
+				Dimensions: []string{"container_env", "container_app", "title"},
+				ValueField: "errorPercentage",
+				RuleName:   "global-wag-circuit-breakers",
+			}},
+		},
 	}
-	assert.Equal(t, expected, routes[0])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := wagCircuitBreakerRoutes(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("wagCircuitBreakerRoutes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
-func TestAppLifecycleRoutes(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := appLifecycleRoutes(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("Routes a log")
-	fields = map[string]interface{}{
-		"category": "app_lifecycle",
-		"title":    "app_deploying",
+func Test_appLifecycleRoutes(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
 	}
-	routes = appLifecycleRoutes(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "app_lifecycle",
-		StatType:   statTypeEvent,
-		Dimensions: []string{"container_app", "container_env", "launched_scope", "title", "user", "version", "team"},
-		RuleName:   "global-app-lifecycle",
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log",
+			args: args{
+				fields: map[string]interface{}{
+					"category": "app_lifecycle",
+					"title":    "app_deploying",
+				},
+			},
+			want: []decode.AlertRoute{{
+				Series:     "app_lifecycle",
+				StatType:   statTypeEvent,
+				Dimensions: []string{"container_app", "container_env", "launched_scope", "title", "user", "version", "team"},
+				RuleName:   "global-app-lifecycle",
+			}},
+		},
 	}
-	assert.Equal(t, expected, routes[0])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := appLifecycleRoutes(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("appLifecycleRoutes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestMongoSlowQueries(t *testing.T) {
@@ -365,42 +523,65 @@ func TestMongoSlowQueries(t *testing.T) {
 	}
 }
 
-func TestRDSSlowQueries(t *testing.T) {
-	t.Log("Base case: doesn't route empty log")
-	fields := map[string]interface{}{}
-	routes := rdsSlowQueries(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("rdsadmin slowquery: doesn't route slowquery log by rdsadmin")
-	fields = map[string]interface{}{
-		"rawlog": `# Time: 190921 16:02:59
-		# User@Host: rdsadmin[rdsadmin] @ localhost []  Id:     1
-		# Query_time: 22.741550  Lock_time: 0.000000 Rows_sent: 0  Rows_examined: 0SET timestamp=1569081779;call action start_seamless_scaling('AQEAAB1P/PAIqvTHEQFJAEkojZUoH176FGJttZ62JF5QmRehaf0S0VFTa+5MPJdYQ9k0/sekBlnMi8U=', 300000, 2);
-		SET timestamp=1569862702;
-		INSERT INTO library.section_students (district_id,section_id,student_id,create_date,last_modified) VALUES ('55df7cc8e571c801000007ca','5d41ab6911d20e011822618f','5bad2c48bc3a223d8b1f0a42','2019-09-30T16:58:22Z','2019-09-30T16:58:22Z'), ('55df7cc8e571c801000007ca','5d31b28ab1666804693d3026','5d7c05d51aa571027b97ffbd','2019-09-30T16:58:22Z','2019-09-30T16:58:22Z'),`,
-		"hostname": "aws-rds",
-		"user":     "rdsadmin[rdsadmin]",
+func Test_rdsSlowQueries(t *testing.T) {
+	type args struct {
+		fields map[string]interface{}
 	}
-	routes = rdsSlowQueries(fields)
-	assert.Equal(t, 0, len(routes))
-
-	t.Log("Routes a log")
-	fields = map[string]interface{}{
-		"rawlog": `# Time: 191009 20:19:43
-			# User@Host: clever[clever] @ [10.1.1.213] Id: 13830
-			# Query_time: 0.882220 Lock_time: 0.003195 Rows_sent: 0 Rows_examined: 0
-			SET timestamp=1570652383;
-			INSERT INTO library.section_students (district_id,section_id,student_id,create_date,last_modified) VALUES ('52ea78f3fa9ddfad0d000248','5d5ef6a282f17c0091929c83','56e9cc6b51c4cf115101018e','2019-10-09T20:19:42Z','2019-10-09T20:19:42Z'), ('52ea78f3fa9ddfad0d000248','5d55796801d9fb067557427d','59b96879d3c863b211010748','2019-10-09T20:19:42Z','2019-10-09T20:19:42Z'),`,
-		"hostname": "aws-rds",
-		"user":     "clever[clever]",
+	tests := []struct {
+		name string
+		args args
+		want []decode.AlertRoute
+	}{
+		{
+			name: "Base case: doesn't route empty log",
+			args: args{
+				fields: map[string]interface{}{},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "rdsadmin slowquery: doesn't route slowquery log by rdsadmin",
+			args: args{
+				fields: map[string]interface{}{
+					"rawlog": `# Time: 190921 16:02:59
+					# User@Host: rdsadmin[rdsadmin] @ localhost []  Id:     1
+					# Query_time: 22.741550  Lock_time: 0.000000 Rows_sent: 0  Rows_examined: 0SET timestamp=1569081779;call action start_seamless_scaling('AQEAAB1P/PAIqvTHEQFJAEkojZUoH176FGJttZ62JF5QmRehaf0S0VFTa+5MPJdYQ9k0/sekBlnMi8U=', 300000, 2);
+					SET timestamp=1569862702;
+					INSERT INTO library.section_students (district_id,section_id,student_id,create_date,last_modified) VALUES ('55df7cc8e571c801000007ca','5d41ab6911d20e011822618f','5bad2c48bc3a223d8b1f0a42','2019-09-30T16:58:22Z','2019-09-30T16:58:22Z'), ('55df7cc8e571c801000007ca','5d31b28ab1666804693d3026','5d7c05d51aa571027b97ffbd','2019-09-30T16:58:22Z','2019-09-30T16:58:22Z'),`,
+					"hostname": "aws-rds",
+					"user":     "rdsadmin[rdsadmin]",
+				},
+			},
+			want: []decode.AlertRoute{},
+		},
+		{
+			name: "Routes a log",
+			args: args{
+				fields: map[string]interface{}{
+					"rawlog": `# Time: 191009 20:19:43
+						# User@Host: clever[clever] @ [10.1.1.213] Id: 13830
+						# Query_time: 0.882220 Lock_time: 0.003195 Rows_sent: 0 Rows_examined: 0
+						SET timestamp=1570652383;
+						INSERT INTO library.section_students (district_id,section_id,student_id,create_date,last_modified) VALUES ('52ea78f3fa9ddfad0d000248','5d5ef6a282f17c0091929c83','56e9cc6b51c4cf115101018e','2019-10-09T20:19:42Z','2019-10-09T20:19:42Z'), ('52ea78f3fa9ddfad0d000248','5d55796801d9fb067557427d','59b96879d3c863b211010748','2019-10-09T20:19:42Z','2019-10-09T20:19:42Z'),`,
+					"hostname": "aws-rds",
+					"user":     "clever[clever]",
+				},
+			},
+			want: []decode.AlertRoute{
+				{
+					Series:     "rds.slow-query",
+					Dimensions: []string{"programname"},
+					StatType:   statTypeCounter,
+					RuleName:   "global-rds-slow-query-count",
+				},
+			},
+		},
 	}
-	routes = rdsSlowQueries(fields)
-	assert.Equal(t, 1, len(routes))
-	expected := decode.AlertRoute{
-		Series:     "rds.slow-query",
-		Dimensions: []string{},
-		StatType:   statTypeCounter,
-		RuleName:   "global-rds-slow-query-count",
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rdsSlowQueries(tt.args.fields); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("rdsSlowQueries() = %v, want %v", got, tt.want)
+			}
+		})
 	}
-	assert.Equal(t, expected, routes[0])
 }
