@@ -384,7 +384,7 @@ func rdsSlowQueries(fields map[string]interface{}) []decode.AlertRoute {
 
 	// filter out slowqueries by rdsadmin
 	user, ok := fields["user"].(string)
-	if user == "rdsadmin[rdsadmin]" {
+	if !ok || user == "rdsadmin[rdsadmin]" {
 		return []decode.AlertRoute{}
 	}
 
