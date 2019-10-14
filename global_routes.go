@@ -28,6 +28,7 @@ func globalRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	routes = append(routes, gearcmdHeartbeatRoutes(fields)...)
 	routes = append(routes, wagCircuitBreakerRoutes(fields)...)
 	routes = append(routes, appLifecycleRoutes(fields)...)
+	routes = append(routes, rdsSlowQueries(fields)...)
 
 	return routes
 }
@@ -368,6 +369,32 @@ func mongoSlowQueries(fields *map[string]interface{}) []decode.AlertRoute {
 			StatType:   statTypeGauge,
 			ValueField: "millis",
 			RuleName:   "global-mongo-slow-query-gauge",
+		},
+	}
+}
+
+func rdsSlowQueries(fields map[string]interface{}) []decode.AlertRoute {
+	hostname, ok := fields["hostname"].(string)
+	if !ok {
+		return []decode.AlertRoute{}
+	}
+	if hostname != "aws-rds" {
+		return []decode.AlertRoute{}
+	}
+
+	// filter out slowqueries by rdsadmin
+	user, ok := fields["user"].(string)
+	if !ok || user == "rdsadmin[rdsadmin]" {
+		return []decode.AlertRoute{}
+	}
+
+	return []decode.AlertRoute{
+		decode.AlertRoute{
+			Series:     "rds.slow-query",
+			Dimensions: []string{"env", "programname"},
+			StatType:   statTypeCounter,
+			ValueField: defaultValueField,
+			RuleName:   "global-rds-slow-query-count",
 		},
 	}
 }
