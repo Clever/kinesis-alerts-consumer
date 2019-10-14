@@ -391,8 +391,9 @@ func rdsSlowQueries(fields map[string]interface{}) []decode.AlertRoute {
 	return []decode.AlertRoute{
 		decode.AlertRoute{
 			Series:     "rds.slow-query",
-			Dimensions: []string{"programname"},
+			Dimensions: []string{"env", "programname"},
 			StatType:   statTypeCounter,
+			ValueField: defaultValueField,
 			RuleName:   "global-rds-slow-query-count",
 		},
 	}

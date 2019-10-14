@@ -570,8 +570,9 @@ func Test_rdsSlowQueries(t *testing.T) {
 			want: []decode.AlertRoute{
 				{
 					Series:     "rds.slow-query",
-					Dimensions: []string{"programname"},
+					Dimensions: []string{"env", "programname"},
 					StatType:   statTypeCounter,
+					ValueField: defaultValueField,
 					RuleName:   "global-rds-slow-query-count",
 				},
 			},
