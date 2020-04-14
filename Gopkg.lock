@@ -52,12 +52,15 @@
     "internal/shareddefaults",
     "private/protocol",
     "private/protocol/json/jsonutil",
+    "private/protocol/jsonrpc",
     "private/protocol/query",
     "private/protocol/query/queryutil",
     "private/protocol/rest",
     "private/protocol/xml/xmlutil",
     "service/cloudwatch",
     "service/cloudwatch/cloudwatchiface",
+    "service/firehose",
+    "service/firehose/firehoseiface",
     "service/sts",
     "service/sts/stsiface",
   ]
@@ -209,7 +212,7 @@
   revision = "6dc17368e09b0e8634d71cac8168d853e869a0c7"
 
 [[projects]]
-  digest = "1:ebe5a08de85b249031c22bdf7ea4120be2b8e4751cb647ef8aa829774aa87225"
+  digest = "1:0d5cfbb57e8ff8640a5a54082ee555270378a28db24f24a24af530384a9822bc"
   name = "gopkg.in/Clever/kayvee-go.v6"
   packages = [
     ".",
@@ -217,8 +220,8 @@
     "router",
   ]
   pruneopts = ""
-  revision = "1e2557bcbd6982e6303c364505d1c129ede8f2ee"
-  version = "v6.17.0"
+  revision = "e704be3e70f85875fc9a56cdfac2acabb5a3eb92"
+  version = "v6.22.0"
 
 [[projects]]
   digest = "1:6a4a01d58b227c4b6b11111b9f172ec5c17682b82724e58e6daf3f19f4faccd8"

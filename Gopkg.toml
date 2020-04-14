@@ -19,7 +19,7 @@
   name = "golang.org/x/net"
 
 [[constraint]]
-  version = "^6.17.0"
+  version = "^6.22.0"
   name = "gopkg.in/Clever/kayvee-go.v6"
 
 [[constraint]]
