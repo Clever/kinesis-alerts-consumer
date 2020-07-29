@@ -170,7 +170,7 @@
   name = "github.com/stretchr/testify"
   packages = ["assert"]
   pruneopts = ""
-  revision = "6a6c303c3cf499bdb3c3ab72464dc241416e5f80"
+  revision = "ed4976c764638c2061fa1e952539ecaf75ea97f8"
 
 [[projects]]
   branch = "master"
