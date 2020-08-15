@@ -1,6 +1,15 @@
+
 [[constraint]]
   branch = "master"
   name = "github.com/Clever/amazon-kinesis-client-go"
+
+[[constraint]]
+  name = "github.com/aws/aws-sdk-go"
+  version = "1.34.1"
+
+[[constraint]]
+  name = "github.com/eapache/go-resiliency"
+  version = "1.2.0"
 
 [[constraint]]
   branch = "master"
@@ -19,13 +28,5 @@
   name = "golang.org/x/net"
 
 [[constraint]]
-  version = "^6.23.0"
   name = "gopkg.in/Clever/kayvee-go.v6"
-
-[[constraint]]
-  version = "1.2.0"
-  name = "github.com/eapache/go-resiliency"
-
-[[constraint]]
-  version = "^1.34.1"
-  name = "github.com/aws/aws-sdk-go"
+  version = "6.24.0"
