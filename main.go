@@ -77,6 +77,14 @@ func main() {
 		}
 	}()
 
+	// Track Volume
+	go func() {
+		c := time.Tick(time.Minute)
+		for _ = range c {
+			logVolumesAndReset(sfxSink)
+		}
+	}()
+
 	consumer := kbc.NewBatchConsumer(config, ac)
 	consumer.Start()
 }
