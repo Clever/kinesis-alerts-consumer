@@ -3,7 +3,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1b1571ff8b022ecc0b483ff641641f94be86107604bd120d10af2dff03db2c1f"
+  digest = "1:891628e3f558028407936cfe8b9edcdd4ae87975559db589f661ce884046e067"
   name = "github.com/Clever/amazon-kinesis-client-go"
   packages = [
     "batchconsumer",
@@ -13,7 +13,7 @@
     "splitter",
   ]
   pruneopts = ""
-  revision = "4dd769ffcaa2c8f935b68ad89677664cc162e324"
+  revision = "29f86e9986e99c0394838b05c4bbf0d022035b0e"
 
 [[projects]]
   branch = "master"
@@ -22,6 +22,14 @@
   packages = ["rfc3164"]
   pruneopts = ""
   revision = "fb28ad3e4340c046323b7beba685a72fd12ecbe8"
+
+[[projects]]
+  digest = "1:ebf4bf0cc2e8705b66f67fecee8837e26c8b67a11ede9dd1f18a2841b6de5fac"
+  name = "github.com/a8m/kinesis-producer"
+  packages = ["."]
+  pruneopts = ""
+  revision = "2b76ac68f594232c724b44643c6994768d5a5f35"
+  version = "v0.2.0"
 
 [[projects]]
   digest = "1:386989134b515601e0da4c70c02052ccd4f89f4fb9f8ba556ea4833f3971f947"
@@ -55,13 +63,17 @@
     "internal/strings",
     "internal/sync/singleflight",
     "private/protocol",
+    "private/protocol/eventstream",
+    "private/protocol/eventstream/eventstreamapi",
     "private/protocol/json/jsonutil",
+    "private/protocol/jsonrpc",
     "private/protocol/query",
     "private/protocol/query/queryutil",
     "private/protocol/rest",
     "private/protocol/xml/xmlutil",
     "service/cloudwatch",
     "service/cloudwatch/cloudwatchiface",
+    "service/kinesis",
     "service/sts",
     "service/sts/stsiface",
   ]
@@ -86,12 +98,12 @@
   version = "v1.2.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:54859951ba785c9f5c7a0e665a9fe9fb6b1afeef112c62eaad77081d3d5916cc"
+  digest = "1:6532affeeaaccdc6919d5773516176b77de02b4af8cf9a7fac16bae77aa319c5"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   pruneopts = ""
-  revision = "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+  revision = "4846b58453b3708320bdb524f25cc5a1d9cda4d4"
+  version = "v1.4.3"
 
 [[projects]]
   branch = "master"
@@ -107,6 +119,14 @@
   packages = ["."]
   pruneopts = ""
   revision = "c2b33e84"
+
+[[projects]]
+  digest = "1:ef0f9731bc6c3c59396adc50f36da36ca98c704812c449794f9326f7bc64b5f1"
+  name = "github.com/jpillora/backoff"
+  packages = ["."]
+  pruneopts = ""
+  revision = "8eab2debe79d12b7bd3d10653910df25fa9552ba"
+  version = "1.0.0"
 
 [[projects]]
   branch = "master"
@@ -211,6 +231,41 @@
   packages = ["rate"]
   pruneopts = ""
   revision = "6dc17368e09b0e8634d71cac8168d853e869a0c7"
+
+[[projects]]
+  digest = "1:0d049ff01749ce1d6092c85cb90a02dfdb3b401939b13415b7e608f36bc8ecee"
+  name = "google.golang.org/protobuf"
+  packages = [
+    "encoding/prototext",
+    "encoding/protowire",
+    "internal/descfmt",
+    "internal/descopts",
+    "internal/detrand",
+    "internal/encoding/defval",
+    "internal/encoding/messageset",
+    "internal/encoding/tag",
+    "internal/encoding/text",
+    "internal/errors",
+    "internal/fieldsort",
+    "internal/filedesc",
+    "internal/filetype",
+    "internal/flags",
+    "internal/genid",
+    "internal/impl",
+    "internal/mapsort",
+    "internal/pragma",
+    "internal/set",
+    "internal/strs",
+    "internal/version",
+    "proto",
+    "reflect/protoreflect",
+    "reflect/protoregistry",
+    "runtime/protoiface",
+    "runtime/protoimpl",
+  ]
+  pruneopts = ""
+  revision = "3f7a61f89bb6813f89d981d1870ed68da0b3c3f1"
+  version = "v1.25.0"
 
 [[projects]]
   digest = "1:0923ed679d96b9e53b8c43892e2094ebb5dccd0a66709b20c90f43c37ff71ff1"
