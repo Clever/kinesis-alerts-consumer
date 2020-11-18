@@ -9,6 +9,15 @@ routes:
       dimensions: [ ]
       value_field: "unknown-error" 
       stat_type: "counter"
+  log-volume-send-failure:
+    matchers:
+      title: ["failed-sending-volumes"]
+    output:
+      type: "notifications"
+      channel: "#eng-infra-alerts-minor"
+      icon: ":signalfx:"
+      user: "kinesis-alerts-consumer"
+      message: "Error sending log volumes: ```%{error}```"
   cloudwatch-errors:
     matchers:
       title: ["error-sending-to-cloudwatch"]

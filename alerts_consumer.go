@@ -83,6 +83,10 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	// Determine routes
 	// KVMeta Routes
 	kvmeta := decode.ExtractKVMeta(fields)
+	env, _ := fields["container_env"].(string)
+	app, _ := fields["container_app"].(string)
+	updatelogVolumes(env, app, kvmeta.Team)
+
 	routes := kvmeta.Routes.AlertRoutes()
 	for idx := range routes {
 		routes[idx].Dimensions = append(routes[idx].Dimensions, sfxDefaultDimensions...)
