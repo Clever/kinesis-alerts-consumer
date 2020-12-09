@@ -166,7 +166,7 @@ func TestEncodeMessage(t *testing.T) {
 		},
 	}
 
-	output, tags, err := consumer.encodeMessage(input)
+	output, tags, err := consumer.encodeMessage(input, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
@@ -219,7 +219,7 @@ func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
 		},
 	}
 
-	output, tags, err := consumer.encodeMessage(input)
+	output, tags, err := consumer.encodeMessage(input, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
@@ -271,7 +271,7 @@ func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
 		},
 	}
 
-	_, _, err := consumer.encodeMessage(input)
+	_, _, err := consumer.encodeMessage(input, 0)
 	assert.Error(t, err)
 	assert.EqualError(t, err, "error casting dimension value. rule=rule-1 dim=dim_error val={}")
 }
@@ -299,7 +299,7 @@ func TestEncodeMessageErrorsIfValueExistsAndIsInvalidType(t *testing.T) {
 		},
 	}
 
-	_, _, err := consumer.encodeMessage(input)
+	_, _, err := consumer.encodeMessage(input, 0)
 	assert.Error(t, err)
 	assert.EqualError(t, err, "value exists but is wrong type. rule=rule-1 value_field=value value=12345")
 }
@@ -329,7 +329,7 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 		},
 	}
 
-	output, tags, err := consumer.encodeMessage(input)
+	output, tags, err := consumer.encodeMessage(input, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
@@ -390,7 +390,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 		},
 	}
 
-	output, tags, err := consumer.encodeMessage(input)
+	output, tags, err := consumer.encodeMessage(input, 0)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
@@ -449,7 +449,7 @@ func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
 			},
 		},
 	}
-	_, _, err := consumer.encodeMessage(input)
+	_, _, err := consumer.encodeMessage(input, 0)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "intentionally skipped")
 }

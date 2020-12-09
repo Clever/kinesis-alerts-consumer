@@ -60,7 +60,7 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 		return nil, []string{}, err
 	}
 
-	return c.encodeMessage(fields)
+	return c.encodeMessage(fields, len(rawmsg))
 }
 
 type EncodeOutput struct {
@@ -79,7 +79,7 @@ func contains(slice []string, s string) bool {
 	return false
 }
 
-func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, []string, error) {
+func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes int) ([]byte, []string, error) {
 	// Determine routes
 	// KVMeta Routes
 	kvmeta := decode.ExtractKVMeta(fields)
@@ -89,7 +89,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}) ([]byte, [
 	if team == "" {
 		team = kvmeta.Team
 	}
-	updatelogVolumes(env, app, team)
+	updatelogVolumes(env, app, team, numBytes)
 
 	routes := kvmeta.Routes.AlertRoutes()
 	for idx := range routes {
