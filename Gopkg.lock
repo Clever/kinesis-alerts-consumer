@@ -186,11 +186,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:81a176cfb198bb3479a124befc52339e53bcd30d33379e81ba90a2245fc26675"
+  digest = "1:1401005accb5182afd93a39cd8fda3bca9475319fe8558f9d3d1677f1d90bd38"
   name = "github.com/stretchr/testify"
   packages = ["assert"]
   pruneopts = ""
-  revision = "acba37e5db06f0093b465a7d47822bf13644b66c"
+  revision = "bf646ea5b3bc34063245c622e199ed1e26bef34f"
 
 [[projects]]
   branch = "master"
