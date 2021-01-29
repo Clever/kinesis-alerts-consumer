@@ -32,7 +32,7 @@
   version = "v0.2.0"
 
 [[projects]]
-  digest = "1:69cb1505ea34c19d7d4d3271a379f750183461f4ee001ac70d032719fb159f53"
+  digest = "1:d65361e9246cb5629ce6df680849dad50234872ccd471cd45e2b3d49f0df01de"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -45,6 +45,7 @@
     "aws/credentials/ec2rolecreds",
     "aws/credentials/endpointcreds",
     "aws/credentials/processcreds",
+    "aws/credentials/ssocreds",
     "aws/credentials/stscreds",
     "aws/csm",
     "aws/defaults",
@@ -70,16 +71,19 @@
     "private/protocol/query",
     "private/protocol/query/queryutil",
     "private/protocol/rest",
+    "private/protocol/restjson",
     "private/protocol/xml/xmlutil",
     "service/cloudwatch",
     "service/cloudwatch/cloudwatchiface",
     "service/kinesis",
+    "service/sso",
+    "service/sso/ssoiface",
     "service/sts",
     "service/sts/stsiface",
   ]
   pruneopts = ""
-  revision = "a9639756e39592357b7838aa731ccbd43a18cd1b"
-  version = "v1.36.2"
+  revision = "df821b14ab982657900b1986db282156f3652836"
+  version = "v1.37.0"
 
 [[projects]]
   digest = "1:56c130d885a4aacae1dd9c7b71cfe39912c7ebc1ff7d2b46083c8812996dc43b"
