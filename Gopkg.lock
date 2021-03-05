@@ -2,8 +2,7 @@
 
 
 [[projects]]
-  branch = "master"
-  digest = "1:6ef2dfc3e1f2773e2677f63081006e8601f6ad1c3a26096690ffb031cf3ba2ee"
+  digest = "1:e4a8ad9394f2cc275b36155d47921ef7ab4a9b1b4a5496ab68f470e219c93271"
   name = "github.com/Clever/amazon-kinesis-client-go"
   packages = [
     "batchconsumer",
@@ -13,7 +12,8 @@
     "splitter",
   ]
   pruneopts = ""
-  revision = "358de6589c9b8b0c4a4bb85ef0f6954828432230"
+  revision = "6ac018712d3d8bda827af0226cee49f7b4c5f9d6"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
@@ -320,69 +320,19 @@
   analyzer-version = 1
   input-imports = [
     "github.com/Clever/amazon-kinesis-client-go/batchconsumer",
-    "github.com/Clever/amazon-kinesis-client-go/batchconsumer/stats",
     "github.com/Clever/amazon-kinesis-client-go/decode",
-    "github.com/Clever/amazon-kinesis-client-go/kcl",
-    "github.com/Clever/amazon-kinesis-client-go/splitter",
-    "github.com/Clever/syslogparser/rfc3164",
     "github.com/aws/aws-sdk-go/aws",
-    "github.com/aws/aws-sdk-go/aws/awserr",
-    "github.com/aws/aws-sdk-go/aws/awsutil",
-    "github.com/aws/aws-sdk-go/aws/client",
-    "github.com/aws/aws-sdk-go/aws/client/metadata",
-    "github.com/aws/aws-sdk-go/aws/corehandlers",
-    "github.com/aws/aws-sdk-go/aws/credentials",
-    "github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds",
-    "github.com/aws/aws-sdk-go/aws/credentials/endpointcreds",
-    "github.com/aws/aws-sdk-go/aws/credentials/processcreds",
-    "github.com/aws/aws-sdk-go/aws/credentials/stscreds",
-    "github.com/aws/aws-sdk-go/aws/csm",
-    "github.com/aws/aws-sdk-go/aws/defaults",
-    "github.com/aws/aws-sdk-go/aws/ec2metadata",
-    "github.com/aws/aws-sdk-go/aws/endpoints",
-    "github.com/aws/aws-sdk-go/aws/request",
     "github.com/aws/aws-sdk-go/aws/session",
-    "github.com/aws/aws-sdk-go/aws/signer/v4",
-    "github.com/aws/aws-sdk-go/private/protocol",
-    "github.com/aws/aws-sdk-go/private/protocol/json/jsonutil",
-    "github.com/aws/aws-sdk-go/private/protocol/query",
-    "github.com/aws/aws-sdk-go/private/protocol/query/queryutil",
-    "github.com/aws/aws-sdk-go/private/protocol/rest",
-    "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
     "github.com/aws/aws-sdk-go/service/cloudwatch",
     "github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface",
-    "github.com/aws/aws-sdk-go/service/sts",
-    "github.com/aws/aws-sdk-go/service/sts/stsiface",
-    "github.com/davecgh/go-spew/spew",
     "github.com/eapache/go-resiliency/retrier",
-    "github.com/golang/protobuf/proto",
-    "github.com/jeromer/syslogparser",
-    "github.com/jmespath/go-jmespath",
     "github.com/kardianos/osext",
-    "github.com/kr/logfmt",
-    "github.com/pmezard/go-difflib/difflib",
-    "github.com/signalfx/com_signalfx_metrics_protobuf",
-    "github.com/signalfx/gohistogram",
     "github.com/signalfx/golib/datapoint",
-    "github.com/signalfx/golib/errors",
     "github.com/signalfx/golib/event",
-    "github.com/signalfx/golib/eventcounter",
-    "github.com/signalfx/golib/log",
     "github.com/signalfx/golib/sfxclient",
-    "github.com/signalfx/golib/timekeeper",
     "github.com/stretchr/testify/assert",
-    "github.com/xeipuuv/gojsonpointer",
-    "github.com/xeipuuv/gojsonreference",
-    "github.com/xeipuuv/gojsonschema",
     "golang.org/x/net/context",
-    "golang.org/x/time/rate",
-    "gopkg.in/Clever/kayvee-go.v6",
     "gopkg.in/Clever/kayvee-go.v6/logger",
-    "gopkg.in/Clever/kayvee-go.v6/router",
-    "gopkg.in/logfmt.v0",
-    "gopkg.in/stack.v1",
-    "gopkg.in/yaml.v2",
-    "gopkg.in/yaml.v3",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
