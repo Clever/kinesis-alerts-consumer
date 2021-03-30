@@ -9,13 +9,12 @@ env:
 - READ_RATE_LIMIT
 - SFX_API_TOKEN
 resources:
-  cpu: 0.2
-  soft_mem_limit: 1.0
-  max_mem: 3.0
+  cpu: 4
+  max_mem: 8
 shepherds:
-- "nathan.leiby@clever.com"
+- nathan.leiby@clever.com
 expose: []
-team: "eng-infra"
+team: eng-infra
 aws:
   dynamodb:
     read:
@@ -26,3 +25,9 @@ aws:
     clever:
     - CloudWatchMetricsWriter
     - KinesisLogsConsumer
+pod_config:
+  dev:
+    migrationState: podOnly
+  group: us-west-1
+  prod:
+    migrationState: podOnly
