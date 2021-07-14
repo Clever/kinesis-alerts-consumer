@@ -5,7 +5,7 @@
 
 [[constraint]]
   name = "github.com/aws/aws-sdk-go"
-  version = "1.39.3"
+  version = "1.39.5"
 
 [[constraint]]
   name = "github.com/eapache/go-resiliency"
