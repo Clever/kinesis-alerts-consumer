@@ -50,44 +50,6 @@ func TestProcessMessage(t *testing.T) {
 	assert.Equal(t, expectedPts, eo.Datapoints)
 }
 
-func TestProcessMessageSupportsAppLifecycleEvents(t *testing.T) {
-	consumer := AlertsConsumer{
-		deployEnv: "test-env",
-	}
-	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"title":"app_deploying","category":"app_lifecycle"}`
-	msg, tags, err := consumer.ProcessMessage([]byte(rawmsg))
-	assert.NoError(t, err)
-
-	expectedTags := []string{"default"}
-	assert.Equal(t, expectedTags, tags)
-
-	// Verify the message
-	t.Log("verify the message")
-	eo := EncodeOutput{}
-	err = json.Unmarshal(msg, &eo)
-	assert.NoError(t, err)
-
-	expected := EncodeOutput{
-		Datapoints: []*datapoint.Datapoint{},
-		Events: []*event.Event{
-			&event.Event{
-				EventType: "app_lifecycle",
-				Category:  event.USERDEFINED,
-				Dimensions: map[string]string{
-					"container_app": "my-app",
-					"container_env": "production",
-					"title":         "app_deploying",
-				},
-				Properties: map[string]interface{}{},
-				Timestamp:  time.Unix(1502822347, 0).UTC(),
-			},
-		},
-		MetricData: []*cloudwatch.MetricDatum{},
-	}
-
-	assert.Equal(t, expected, eo)
-}
-
 func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 	consumer := AlertsConsumer{
 		deployEnv: "test-env",

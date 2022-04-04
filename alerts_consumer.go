@@ -20,7 +20,6 @@ import (
 )
 
 var lg = logger.New("kinesis-alerts-consumer")
-var sfxSink *sfxclient.HTTPSink
 
 const cloudwatchNamespace = "LogMetrics"
 
