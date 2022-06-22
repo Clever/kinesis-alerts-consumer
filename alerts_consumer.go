@@ -350,7 +350,7 @@ func datadogMetricPayloadFromPts(pts []*datapoint.Datapoint) *datadog.MetricPayl
 	}
 	for i, pt := range pts {
 		payload.Series[i] = datadog.MetricSeries{
-			Metric: pt.Metric,
+			Metric: "kv." + pt.Metric,
 			Type:   sfxToDatadogMetricType(pt.MetricType),
 			Tags:   sfxDimsToDDTags(pt.Dimensions),
 			Points: []datadog.MetricPoint{

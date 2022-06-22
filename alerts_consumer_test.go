@@ -708,8 +708,8 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, append(pts, pts2...), mockSink.pts)
 	assert.Equal(t, datadog.METRICINTAKETYPE_GAUGE, *mockDD.inputs[0].Series[0].Type)
-	assert.Equal(t, "series-name", mockDD.inputs[0].Series[0].Metric)
-	assert.Equal(t, "series-name-4", mockDD.inputs[0].Series[3].Metric)
+	assert.Equal(t, "kv.series-name", mockDD.inputs[0].Series[0].Metric)
+	assert.Equal(t, "kv.series-name-4", mockDD.inputs[0].Series[3].Metric)
 }
 
 func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
