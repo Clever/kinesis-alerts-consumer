@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
 	"testing"
 	"time"
 
+	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
@@ -445,6 +447,16 @@ func (cw *MockCW) PutMetricData(input *cloudwatch.PutMetricDataInput) (*cloudwat
 	return nil, nil
 }
 
+type MockDD struct {
+	DDMetricsAPI
+	inputs []datadog.MetricPayload
+}
+
+func (dd *MockDD) SubmitMetrics(ctx context.Context, body datadog.MetricPayload, o ...datadog.SubmitMetricsOptionalParameters) (datadog.IntakePayloadAccepted, *http.Response, error) {
+	dd.inputs = append(dd.inputs, body)
+	return datadog.IntakePayloadAccepted{}, nil, nil
+}
+
 func TestSendBatch(t *testing.T) {
 	pts := []*datapoint.Datapoint{
 		&datapoint.Datapoint{
@@ -511,9 +523,11 @@ func TestSendBatch(t *testing.T) {
 	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": mockCWUSWest1,
 	}
+	mockDD := &MockDD{}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
 		cwAPIs:  mockCWs,
+		dd:      mockDD,
 	}
 	t.Log("Send first batch")
 	err = consumer.SendBatch(input, "default")
@@ -605,9 +619,11 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": mockCWUSWest1,
 	}
+	mockDD := &MockDD{}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
 		cwAPIs:  mockCWs,
+		dd:      mockDD,
 	}
 	t.Log("Send batch")
 	err = consumer.SendBatch(input, "us-west-1")
@@ -681,14 +697,19 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": &mockCWUSWest1,
 	}
+	mockDD := &MockDD{}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
 		cwAPIs:  mockCWs,
+		dd:      mockDD,
 	}
 	t.Log("Send batch with multiple entries")
 	err = consumer.SendBatch(input, "default")
 	assert.NoError(t, err)
 	assert.Equal(t, append(pts, pts2...), mockSink.pts)
+	assert.Equal(t, datadog.METRICINTAKETYPE_GAUGE, *mockDD.inputs[0].Series[0].Type)
+	assert.Equal(t, "kv.series-name", mockDD.inputs[0].Series[0].Metric)
+	assert.Equal(t, "kv.series-name-4", mockDD.inputs[0].Series[3].Metric)
 }
 
 func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
@@ -733,9 +754,11 @@ func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
 	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": &mockCWUSWest1,
 	}
+	mockDD := &MockDD{}
 	consumer := AlertsConsumer{
 		sfxSink: mockSink,
 		cwAPIs:  mockCWs,
+		dd:      mockDD,
 	}
 	t.Log("Send first batch")
 	err = consumer.SendBatch(input, "default")
