@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
+	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
@@ -28,6 +30,7 @@ var sfxDefaultDimensions = []string{"Hostname", "env"}
 // AlertsConsumer sends datapoints to SignalFX
 // It implements the kbc.Sender interface
 type AlertsConsumer struct {
+	dd        DDMetricsAPI
 	sfxSink   httpSinkInterface
 	deployEnv string
 	cwAPIs    map[string]cloudwatchiface.CloudWatchAPI
@@ -38,8 +41,14 @@ type httpSinkInterface interface {
 	AddEvents(context.Context, []*event.Event) error
 }
 
-func NewAlertsConsumer(sfxSink httpSinkInterface, deployEnv string, cwAPIs map[string]cloudwatchiface.CloudWatchAPI) *AlertsConsumer {
+// DDMetricsAPI is the subset of the Datadog Metrics API that we use
+type DDMetricsAPI interface {
+	SubmitMetrics(ctx context.Context, body datadog.MetricPayload, o ...datadog.SubmitMetricsOptionalParameters) (datadog.IntakePayloadAccepted, *http.Response, error)
+}
+
+func NewAlertsConsumer(dd DDMetricsAPI, sfxSink httpSinkInterface, deployEnv string, cwAPIs map[string]cloudwatchiface.CloudWatchAPI) *AlertsConsumer {
 	return &AlertsConsumer{
+		dd:        dd,
 		sfxSink:   sfxSink,
 		deployEnv: deployEnv,
 		cwAPIs:    cwAPIs,
@@ -299,6 +308,18 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	}
 
 	err = retry.Run(func() error {
+		lg.TraceD("dd-submit-metrics", logger.M{"point-count": len(pts)})
+		ctx := datadog.NewDefaultContext(context.Background())
+		body := datadogMetricPayloadFromPts(pts)
+		_, _, err := c.dd.SubmitMetrics(ctx, *body)
+		return err
+	})
+	if err != nil {
+		lg.ErrorD("dd-submit-metrics", logger.M{"error": err.Error()})
+		return kbc.PartialSendBatchError{ErrMessage: "failed to send metrics to datadog: " + err.Error(), FailedMessages: batch}
+	}
+
+	err = retry.Run(func() error {
 		lg.TraceD("sfx-events", logger.M{"point-count": len(evts)})
 		return c.sfxSink.AddEvents(context.Background(), evts)
 	})
@@ -321,4 +342,53 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	}
 
 	return nil
+}
+
+func datadogMetricPayloadFromPts(pts []*datapoint.Datapoint) *datadog.MetricPayload {
+	payload := datadog.MetricPayload{
+		Series: make([]datadog.MetricSeries, len(pts)),
+	}
+	for i, pt := range pts {
+		payload.Series[i] = datadog.MetricSeries{
+			Metric: pt.Metric,
+			Type:   sfxToDatadogMetricType(pt.MetricType),
+			Tags:   sfxDimsToDDTags(pt.Dimensions),
+			Points: []datadog.MetricPoint{
+				{
+					Timestamp: datadog.PtrInt64(pt.Timestamp.Unix()),
+					Value:     sfxToDatadogValue(pt.Value),
+				},
+			},
+		}
+	}
+
+	return &payload
+}
+
+func sfxToDatadogMetricType(mt datapoint.MetricType) *datadog.MetricIntakeType {
+	t := datadog.METRICINTAKETYPE_UNSPECIFIED
+	if mt == datapoint.Counter {
+		t = datadog.METRICINTAKETYPE_COUNT
+	} else if mt == datapoint.Gauge {
+		t = datadog.METRICINTAKETYPE_GAUGE
+	}
+	return &t
+}
+
+func sfxDimsToDDTags(dims map[string]string) []string {
+	tags := []string{}
+	for k, v := range dims {
+		tags = append(tags, fmt.Sprintf("%s:%s", k, v))
+	}
+	return tags
+}
+
+func sfxToDatadogValue(val datapoint.Value) *float64 {
+	var v float64
+	if i, ok := val.(datapoint.IntValue); ok {
+		v = float64(i.Int())
+	} else if f, ok := val.(datapoint.FloatValue); ok {
+		v = f.Float()
+	}
+	return &v
 }

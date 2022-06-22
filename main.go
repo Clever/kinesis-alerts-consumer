@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
+	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/kardianos/osext"
@@ -67,7 +68,10 @@ func main() {
 		"us-east-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-east-1")})),
 		"us-east-2": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-east-2")})),
 	}
-	ac := NewAlertsConsumer(sfxSink, getEnv("DEPLOY_ENV"), cwAPIs)
+
+	ddAPIClient := datadog.NewAPIClient(datadog.NewConfiguration())
+
+	ac := NewAlertsConsumer(ddAPIClient.MetricsApi, sfxSink, getEnv("DEPLOY_ENV"), cwAPIs)
 
 	// Track Max Delay
 	go func() {

@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/Clever/amazon-kinesis-client-go v1.0.0
 	github.com/Clever/syslogparser v0.0.0-20170816194131-fb28ad3e4340 // indirect
+	github.com/DataDog/datadog-api-client-go v1.14.0
 	github.com/a8m/kinesis-producer v0.2.0 // indirect
 	github.com/aws/aws-sdk-go v1.38.68
 	github.com/dropbox/godropbox v0.0.0-20200228041828-52ad444d3502 // indirect
