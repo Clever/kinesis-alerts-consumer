@@ -12,6 +12,9 @@ env:
 resources:
   cpu: 4
   max_mem: 8
+autoscaling:
+  min_count: 20
+  max_count: 20
 shepherds:
 - nathan.leiby@clever.com
 expose: []
