@@ -7,15 +7,21 @@ import (
 
 var maxDelay = atomic.Int64{}
 
-func updateMaxDelay(t time.Time) {
+func updateMaxDelay(ts []time.Time) {
 	cur := maxDelay.Load()
 	// If a timestamp is set
-	if (t != time.Time{}) {
-		// how long ago is the log from?
-		lag := int64(time.Now().Sub(t))
-		if lag > cur {
-			maxDelay.Store(lag)
+	var max int64
+	for _, t := range ts {
+		if (t != time.Time{}) {
+			// how long ago is the log from?
+			lag := int64(time.Now().Sub(t))
+			if lag > cur {
+				max = lag
+			}
 		}
+	}
+	if max > cur {
+		maxDelay.Store(max)
 	}
 }
 
