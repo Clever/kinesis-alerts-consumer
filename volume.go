@@ -39,7 +39,7 @@ func updatelogVolumes(env, app, team string, numBytes int) {
 	}
 	logVolumesLock.Lock()
 	defer logVolumesLock.Unlock()
-	vol, _ := logVolumesByEnvAppTeam[envAppTeam{
+	vol := logVolumesByEnvAppTeam[envAppTeam{
 		env:  env,
 		app:  app,
 		team: team,
