@@ -6,5 +6,5 @@ package main
 // Also note that Cloudwatch can only take inputs with up to 20 different metrics, so if this list
 // gets large we will have to reduce the batch count in main.go
 var cloudwatchAllowList = map[string]struct{}{
-	"ContainerExitCount": struct{}{},
+	"ContainerExitCount": {},
 }

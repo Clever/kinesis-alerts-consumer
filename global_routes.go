@@ -63,7 +63,7 @@ func processMetricsRoutes(fields map[string]interface{}) []decode.AlertRoute {
 	}
 
 	return []decode.AlertRoute{
-		decode.AlertRoute{
+		{
 			Series:     fmt.Sprintf("process-metrics.%s", title),
 			Dimensions: []string{"Hostname", "env", "source"},
 			StatType:   statType,
@@ -109,7 +109,7 @@ func mongoSlowQueries(fields *map[string]interface{}) []decode.AlertRoute {
 	(*fields)["millis"] = millis
 
 	return []decode.AlertRoute{
-		decode.AlertRoute{
+		{
 			Series: "mongo.slow-query",
 			Dimensions: []string{
 				"hostname",
@@ -120,7 +120,7 @@ func mongoSlowQueries(fields *map[string]interface{}) []decode.AlertRoute {
 			StatType: statTypeCounter,
 			RuleName: "global-mongo-slow-query-count",
 		},
-		decode.AlertRoute{
+		{
 			Series: "mongo.slow-query-millis",
 			Dimensions: []string{
 				"hostname",
@@ -151,7 +151,7 @@ func rdsSlowQueries(fields map[string]interface{}) []decode.AlertRoute {
 	}
 
 	return []decode.AlertRoute{
-		decode.AlertRoute{
+		{
 			Series:     "rds.slow-query",
 			Dimensions: []string{"env", "programname"},
 			StatType:   statTypeCounter,
