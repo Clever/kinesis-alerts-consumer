@@ -14,7 +14,7 @@ func updateMaxDelay(ts []time.Time) {
 	for _, t := range ts {
 		if (t != time.Time{}) {
 			// how long ago is the log from?
-			lag := int64(time.Now().Sub(t))
+			lag := int64(time.Since(t))
 			if lag > cur {
 				max = lag
 			}
@@ -26,7 +26,7 @@ func updateMaxDelay(ts []time.Time) {
 }
 
 func isRecent(t time.Time, allowedDelay time.Duration) bool {
-	return time.Now().Sub(t) <= allowedDelay
+	return time.Since(t) <= allowedDelay
 }
 
 func logMaxDelayThenReset() {
