@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/kardianos/osext"
-	"github.com/signalfx/golib/sfxclient"
 	"gopkg.in/Clever/kayvee-go.v6/logger"
 )
 
@@ -59,8 +58,7 @@ func main() {
 		ReadRateLimit:  getIntEnv("READ_RATE_LIMIT"),
 	}
 
-	sfxSink := sfxclient.NewHTTPSink()
-	sfxSink.AuthToken = getEnv("SFX_API_TOKEN")
+	// TODO: drop SFX env vars?
 
 	cwAPIs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-1")})),
@@ -71,21 +69,19 @@ func main() {
 
 	ddAPIClient := datadog.NewAPIClient(datadog.NewConfiguration())
 
-	ac := NewAlertsConsumer(ddAPIClient.MetricsApi, sfxSink, getEnv("DEPLOY_ENV"), cwAPIs)
+	ac := NewAlertsConsumer(ddAPIClient.MetricsApi, getEnv("DEPLOY_ENV"), cwAPIs)
 
 	// Track Max Delay
 	go func() {
-		c := time.Tick(15 * time.Second)
-		for _ = range c {
+		for range time.Tick(15 * time.Second) {
 			logMaxDelayThenReset()
 		}
 	}()
 
 	// Track Volume
 	go func() {
-		c := time.Tick(time.Minute)
-		for _ = range c {
-			logVolumesAndReset(sfxSink)
+		for range time.Tick(time.Minute) {
+			logVolumesAndReset(ddAPIClient)
 		}
 	}()
 
