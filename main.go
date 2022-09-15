@@ -81,7 +81,7 @@ func main() {
 	// Track Volume
 	go func() {
 		for range time.Tick(time.Minute) {
-			logVolumesAndReset(ddAPIClient)
+			logVolumesAndReset(ddAPIClient.MetricsApi)
 		}
 	}()
 
