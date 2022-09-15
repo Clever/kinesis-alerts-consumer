@@ -1,23 +1,20 @@
 package main
 
 import (
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
-var maxDelay = 0 * time.Millisecond
-var maxDelayLock = sync.RWMutex{}
+var maxDelay = atomic.Int64{}
 
 func updateMaxDelay(t time.Time) {
-	maxDelayLock.Lock()
-	defer maxDelayLock.Unlock()
-
+	cur := maxDelay.Load()
 	// If a timestamp is set
 	if (t != time.Time{}) {
 		// how long ago is the log from?
-		lag := time.Now().Sub(t)
-		if lag > maxDelay {
-			maxDelay = lag
+		lag := int64(time.Now().Sub(t))
+		if lag > cur {
+			maxDelay.Store(lag)
 		}
 	}
 }
@@ -27,9 +24,7 @@ func isRecent(t time.Time, allowedDelay time.Duration) bool {
 }
 
 func logMaxDelayThenReset() {
-	maxDelayLock.Lock()
-	defer maxDelayLock.Unlock()
-	lg.GaugeFloat("max-log-delay", maxDelay.Seconds())
+	lg.GaugeFloat("max-log-delay", time.Duration(maxDelay.Load()).Seconds())
 	// Reset
-	maxDelay = 0
+	maxDelay.Store(0)
 }
