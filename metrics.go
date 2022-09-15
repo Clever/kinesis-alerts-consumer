@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"io/ioutil"
 	"sync"
 	"time"
 
@@ -23,11 +25,19 @@ type volume struct {
 	size  int64
 }
 
-var logVolumesByEnvAppTeam = map[envAppTeam]volume{}
-var logVolumesLock = sync.Mutex{}
-var retry = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+type logRoute struct {
+	app  string
+	name string
+}
 
-func updatelogVolumes(env, app, team string, numBytes int) {
+var (
+	logVolumesByEnvAppTeam = map[envAppTeam]volume{}
+	logRouteVolumes        = map[logRoute]volume{}
+	metricMu               = sync.Mutex{}
+	retry                  = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+)
+
+func recordMetrics(env, app, team string, numBytes int, routeNames []string) {
 	if env == "" {
 		env = "unknown"
 	}
@@ -37,8 +47,8 @@ func updatelogVolumes(env, app, team string, numBytes int) {
 	if team == "" {
 		team = "unknown"
 	}
-	logVolumesLock.Lock()
-	defer logVolumesLock.Unlock()
+	metricMu.Lock()
+	defer metricMu.Unlock()
 	vol := logVolumesByEnvAppTeam[envAppTeam{
 		env:  env,
 		app:  app,
@@ -51,13 +61,18 @@ func updatelogVolumes(env, app, team string, numBytes int) {
 		app:  app,
 		team: team,
 	}] = vol
+
+	for _, n := range routeNames {
+		v := logRouteVolumes[logRoute{app, n}]
+		logRouteVolumes[logRoute{app, n}] = volume{v.count + 1, v.size + int64(numBytes)}
+	}
 }
 
-func logVolumesAndReset(sfx *sfxclient.HTTPSink) {
+func logVolumesAndReset(dd DDMetricsAPI) {
+	metricMu.Lock()
 	logVolumesCopy := logVolumesByEnvAppTeam
-	logVolumesLock.Lock()
 	logVolumesByEnvAppTeam = map[envAppTeam]volume{}
-	logVolumesLock.Unlock()
+	metricMu.Unlock()
 
 	var dps []*datapoint.Datapoint
 	var totalCount, totalSize int64
@@ -77,8 +92,13 @@ func logVolumesAndReset(sfx *sfxclient.HTTPSink) {
 		totalSize += vol.size
 	}
 	err := retry.Run(func() error {
-		lg.TraceD("send-log-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "point-count": len(dps)})
-		return sfx.AddDatapoints(context.Background(), dps)
+		acc, res, err := dd.SubmitMetrics(context.Background(), *datadogMetricPayloadFromPts(dps))
+		lg.TraceD("send-log-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "point-count": len(dps), "dd-response": acc.Status})
+		if res.StatusCode != 202 || err != nil {
+			b, _ := ioutil.ReadAll(res.Body)
+			return fmt.Errorf("status code %d received from DD api Err = %v RawBody = %s", res.StatusCode, err, b)
+		}
+		return nil
 	})
 	if err != nil {
 		lg.ErrorD("failed-sending-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "error": err.Error()})

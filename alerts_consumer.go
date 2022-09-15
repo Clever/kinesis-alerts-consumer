@@ -31,14 +31,8 @@ var sfxDefaultDimensions = []string{"Hostname", "env"}
 // It implements the kbc.Sender interface
 type AlertsConsumer struct {
 	dd        DDMetricsAPI
-	sfxSink   httpSinkInterface
 	deployEnv string
 	cwAPIs    map[string]cloudwatchiface.CloudWatchAPI
-}
-
-type httpSinkInterface interface {
-	AddDatapoints(context.Context, []*datapoint.Datapoint) error
-	AddEvents(context.Context, []*event.Event) error
 }
 
 // DDMetricsAPI is the subset of the Datadog Metrics API that we use
@@ -46,10 +40,9 @@ type DDMetricsAPI interface {
 	SubmitMetrics(ctx context.Context, body datadog.MetricPayload, o ...datadog.SubmitMetricsOptionalParameters) (datadog.IntakePayloadAccepted, *http.Response, error)
 }
 
-func NewAlertsConsumer(dd DDMetricsAPI, sfxSink httpSinkInterface, deployEnv string, cwAPIs map[string]cloudwatchiface.CloudWatchAPI) *AlertsConsumer {
+func NewAlertsConsumer(dd DDMetricsAPI, deployEnv string, cwAPIs map[string]cloudwatchiface.CloudWatchAPI) *AlertsConsumer {
 	return &AlertsConsumer{
 		dd:        dd,
-		sfxSink:   sfxSink,
 		deployEnv: deployEnv,
 		cwAPIs:    cwAPIs,
 	}
@@ -97,7 +90,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 	if team == "" {
 		team = kvmeta.Team
 	}
-	updatelogVolumes(env, app, team, numBytes)
+	recordMetrics(env, app, team, numBytes, kvmeta.Routes.RuleNames())
 
 	routes := kvmeta.Routes.AlertRoutes()
 	for idx := range routes {
