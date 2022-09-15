@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DataDog/datadog-api-client-go/api/v2/datadog"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/eapache/go-resiliency/retrier"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/sfxclient"
 	"golang.org/x/net/context"
 
 	"gopkg.in/Clever/kayvee-go.v6/logger"
@@ -20,14 +20,14 @@ type envAppTeam struct {
 	team string
 }
 
-type volume struct {
-	count int64
-	size  int64
-}
-
 type logRoute struct {
 	app  string
 	name string
+}
+
+type volume struct {
+	count int64
+	size  int64
 }
 
 var (
@@ -64,6 +64,7 @@ func recordMetrics(env, app, team string, numBytes int, routeNames []string) {
 
 	for _, n := range routeNames {
 		v := logRouteVolumes[logRoute{app, n}]
+		// TODO: handle size
 		logRouteVolumes[logRoute{app, n}] = volume{v.count + 1, v.size + int64(numBytes)}
 	}
 }
@@ -74,27 +75,47 @@ func logVolumesAndReset(dd DDMetricsAPI) {
 	logVolumesByEnvAppTeam = map[envAppTeam]volume{}
 	metricMu.Unlock()
 
-	var dps []*datapoint.Datapoint
+	var metrics []datadog.MetricSeries
 	var totalCount, totalSize int64
 	for eat, vol := range logVolumesCopy {
-		dps = append(dps,
-			sfxclient.Cumulative("kinesis-consumer.log-volume-count", map[string]string{
-				"env":         eat.env,
-				"application": eat.app,
-				"team":        eat.team,
-			}, vol.count),
-			sfxclient.Cumulative("kinesis-consumer.log-volume-size", map[string]string{
-				"env":         eat.env,
-				"application": eat.app,
-				"team":        eat.team,
-			}, vol.size))
+		tags := []string{
+			fmt.Sprintf("env:%s", eat.env),
+			fmt.Sprintf("application:%s", eat.app),
+			fmt.Sprintf("team:%s", eat.team),
+		}
+
+		metrics = append(metrics,
+			datadog.MetricSeries{
+				Metric: "kinesis-consumer.log-volume-count",
+				Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
+				Tags:   tags,
+				Points: []datadog.MetricPoint{
+					{
+						Timestamp: datadog.PtrInt64(time.Now().Unix()),
+						Value:     aws.Float64(float64(vol.count)),
+					},
+				},
+			},
+			datadog.MetricSeries{
+				Metric: "kinesis-consumer.log-volume-size",
+				Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
+				Tags:   tags,
+				Points: []datadog.MetricPoint{
+					{
+						Timestamp: datadog.PtrInt64(time.Now().Unix()),
+						Value:     aws.Float64(float64(vol.size)),
+					},
+				},
+			},
+		)
 		totalCount += vol.count
 		totalSize += vol.size
 	}
 	err := retry.Run(func() error {
-		acc, res, err := dd.SubmitMetrics(context.Background(), *datadogMetricPayloadFromPts(dps))
-		lg.TraceD("send-log-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "point-count": len(dps), "dd-response": acc.Status})
+		acc, res, err := dd.SubmitMetrics(context.Background(), *datadog.NewMetricPayload(metrics))
+		lg.TraceD("send-log-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "point-count": len(metrics), "dd-response": acc.Status})
 		if res.StatusCode != 202 || err != nil {
+			// Make a best attempt at reading the body, if we error here then ¯\_(ツ)_/¯
 			b, _ := ioutil.ReadAll(res.Body)
 			return fmt.Errorf("status code %d received from DD api Err = %v RawBody = %s", res.StatusCode, err, b)
 		}

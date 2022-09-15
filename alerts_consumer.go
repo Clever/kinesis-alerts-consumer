@@ -180,25 +180,30 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 			}
 		}
 
-		var metricValue float64
+		var (
+			metricValue float64
+			metricType  datadog.MetricIntakeType
+		)
 		switch route.StatType {
 		case "counter":
+			metricType = datadog.METRICINTAKETYPE_COUNT
 			metricValue = 1
 			if valOk {
 				metricValue = val
 			}
 		case "gauge":
+			metricType = datadog.METRICINTAKETYPE_GAUGE
 			metricValue = 0
 			if valOk {
 				metricValue = val
 			}
 		default:
-			return []byte{}, []string{}, fmt.Errorf("invalid StatType in route: %s", route.StatType)
+			return nil, nil, fmt.Errorf("invalid StatType: %s", route.StatType)
 		}
 
 		eo.DDMetrics = append(eo.DDMetrics, datadog.MetricSeries{
 			Metric: "kv." + route.Series,
-			Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
+			Type:   metricType.Ptr(),
 			Tags:   tags,
 			Points: []datadog.MetricPoint{
 				{
