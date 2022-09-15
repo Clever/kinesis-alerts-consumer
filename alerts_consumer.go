@@ -26,7 +26,7 @@ var (
 
 const cloudwatchNamespace = "LogMetrics"
 
-// AlertsConsumer sends datapoints to SignalFX
+// AlertsConsumer sends datapoints to DataDog
 // It implements the kbc.Sender interface
 type AlertsConsumer struct {
 	dd        DDMetricsAPI
