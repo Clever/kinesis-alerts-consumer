@@ -19,9 +19,8 @@ import (
 )
 
 var (
-	lg = logger.New("kinesis-alerts-consumer")
-	// TODO: ???
-	sfxDefaultDimensions = []string{"Hostname", "env"}
+	lg                = logger.New("kinesis-alerts-consumer")
+	defaultDimensions = []string{"Hostname", "env"}
 )
 
 const cloudwatchNamespace = "LogMetrics"
@@ -92,7 +91,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 
 	routes := kvmeta.Routes.AlertRoutes()
 	for idx := range routes {
-		routes[idx].Dimensions = append(routes[idx].Dimensions, sfxDefaultDimensions...)
+		routes[idx].Dimensions = append(routes[idx].Dimensions, defaultDimensions...)
 	}
 
 	// Global Routes
@@ -134,7 +133,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 				switch t := dimVal.(type) {
 				case string:
 					tags = append(tags, fmt.Sprintf("%s:%s", dim, t))
-					if !contains(sfxDefaultDimensions, dim) {
+					if !contains(defaultDimensions, dim) {
 						cwDims = append(cwDims, &cloudwatch.Dimension{
 							Name:  aws.String(dim),
 							Value: &t,
@@ -281,7 +280,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	// only send to Cloudwatch if the tag is an AWS region
 	if tag == "us-west-1" || tag == "us-west-2" || tag == "us-east-1" || tag == "us-east-2" {
 		lg.TraceD("cloudwatch-add-datapoints", logger.M{"point-count": len(dats)})
-		cw, _ := c.cwAPIs[tag]
+		cw := c.cwAPIs[tag]
 		_, err = cw.PutMetricData(&cloudwatch.PutMetricDataInput{
 			Namespace:  aws.String(cloudwatchNamespace),
 			MetricData: dats,
