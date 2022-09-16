@@ -80,9 +80,8 @@ func main() {
 
 	// Track Volume
 	go func() {
-		for range time.Tick(time.Minute) {
-			logVolumesAndReset(ddAPIClient.MetricsApi)
-		}
+		tic := time.Tick(time.Minute)
+		processMetrics(ddAPIClient.MetricsApi, tic)
 	}()
 
 	consumer := kbc.NewBatchConsumer(config, ac)

@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"sync"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/api/v2/datadog"
@@ -26,15 +25,21 @@ type logRoute struct {
 }
 
 type volume struct {
-	count int64
-	size  int64
+	count int
+	size  int
+}
+
+type work struct {
+	eat  *envAppTeam
+	lr   *logRoute
+	size int
 }
 
 var (
-	logVolumesByEnvAppTeam = map[envAppTeam]volume{}
-	logRouteVolumes        = map[logRoute]volume{}
-	metricMu               = sync.Mutex{}
-	retry                  = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+	envAppTeamVolumes = map[envAppTeam]volume{}
+	logRouteVolumes   = map[logRoute]volume{}
+	retry             = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+	chMetrics         = make(chan work, 10000)
 )
 
 func recordMetrics(env, app, team string, numBytes int, routeNames []string) {
@@ -47,81 +52,90 @@ func recordMetrics(env, app, team string, numBytes int, routeNames []string) {
 	if team == "" {
 		team = "unknown"
 	}
-	metricMu.Lock()
-	defer metricMu.Unlock()
-	vol := logVolumesByEnvAppTeam[envAppTeam{
-		env:  env,
-		app:  app,
-		team: team,
-	}]
-	vol.count += 1
-	vol.size += int64(numBytes)
-	logVolumesByEnvAppTeam[envAppTeam{
-		env:  env,
-		app:  app,
-		team: team,
-	}] = vol
+	chMetrics <- work{
+		eat:  &envAppTeam{env, app, team},
+		size: numBytes,
+	}
 
 	for _, n := range routeNames {
-		v := logRouteVolumes[logRoute{app, n}]
-		// TODO: handle size
-		logRouteVolumes[logRoute{app, n}] = volume{v.count + 1, v.size + int64(numBytes)}
+		chMetrics <- work{
+			lr:   &logRoute{app, n},
+			size: numBytes,
+		}
+	}
+}
+
+func processMetrics(dd DDMetricsAPI, tic <-chan time.Time) {
+	for {
+		select {
+		case <-tic:
+			logVolumesAndReset(dd)
+		case w := <-chMetrics:
+			if w.eat != nil {
+				vol := envAppTeamVolumes[*w.eat]
+				envAppTeamVolumes[*w.eat] = volume{vol.count + 1, vol.size + w.size}
+			}
+			if w.lr != nil {
+				vol := logRouteVolumes[*w.lr]
+				logRouteVolumes[*w.lr] = volume{vol.count + 1, vol.size + w.size}
+			}
+		}
 	}
 }
 
 func logVolumesAndReset(dd DDMetricsAPI) {
-	metricMu.Lock()
-	logVolumesCopy := logVolumesByEnvAppTeam
-	logVolumesByEnvAppTeam = map[envAppTeam]volume{}
-	metricMu.Unlock()
+	logVolumesCopy := envAppTeamVolumes
+	envAppTeamVolumes = map[envAppTeam]volume{}
 
-	var metrics []datadog.MetricSeries
-	var totalCount, totalSize int64
-	for eat, vol := range logVolumesCopy {
-		tags := []string{
-			fmt.Sprintf("env:%s", eat.env),
-			fmt.Sprintf("application:%s", eat.app),
-			fmt.Sprintf("team:%s", eat.team),
-		}
-
-		metrics = append(metrics,
-			datadog.MetricSeries{
-				Metric: "kinesis-consumer.log-volume-count",
-				Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
-				Tags:   tags,
-				Points: []datadog.MetricPoint{
-					{
-						Timestamp: datadog.PtrInt64(time.Now().Unix()),
-						Value:     aws.Float64(float64(vol.count)),
+	// do work that involves network calls async
+	go func() {
+		var metrics []datadog.MetricSeries
+		var totalCount, totalSize int
+		for eat, vol := range logVolumesCopy {
+			tags := []string{
+				fmt.Sprintf("env:%s", eat.env),
+				fmt.Sprintf("application:%s", eat.app),
+				fmt.Sprintf("team:%s", eat.team),
+			}
+			metrics = append(metrics,
+				datadog.MetricSeries{
+					Metric: "kinesis-consumer.log-volume-count",
+					Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
+					Tags:   tags,
+					Points: []datadog.MetricPoint{
+						{
+							Timestamp: datadog.PtrInt64(time.Now().Unix()),
+							Value:     aws.Float64(float64(vol.count)),
+						},
 					},
 				},
-			},
-			datadog.MetricSeries{
-				Metric: "kinesis-consumer.log-volume-size",
-				Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
-				Tags:   tags,
-				Points: []datadog.MetricPoint{
-					{
-						Timestamp: datadog.PtrInt64(time.Now().Unix()),
-						Value:     aws.Float64(float64(vol.size)),
+				datadog.MetricSeries{
+					Metric: "kinesis-consumer.log-volume-size",
+					Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
+					Tags:   tags,
+					Points: []datadog.MetricPoint{
+						{
+							Timestamp: datadog.PtrInt64(time.Now().Unix()),
+							Value:     aws.Float64(float64(vol.size)),
+						},
 					},
 				},
-			},
-		)
-		totalCount += vol.count
-		totalSize += vol.size
-	}
-	err := retry.Run(func() error {
-		acc, res, err := dd.SubmitMetrics(context.Background(), *datadog.NewMetricPayload(metrics))
-		lg.TraceD("send-log-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "point-count": len(metrics), "dd-response": acc.Status})
-		if res.StatusCode != 202 || err != nil {
-			// Make a best attempt at reading the body, if we error here then ¯\_(ツ)_/¯
-			b, _ := ioutil.ReadAll(res.Body)
-			return fmt.Errorf("status code %d received from DD api Err = %v RawBody = %s", res.StatusCode, err, b)
+			)
+			totalCount += vol.count
+			totalSize += vol.size
 		}
-		return nil
-	})
-	if err != nil {
-		lg.ErrorD("failed-sending-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "error": err.Error()})
-	}
+		err := retry.Run(func() error {
+			acc, res, err := dd.SubmitMetrics(context.Background(), *datadog.NewMetricPayload(metrics))
+			lg.TraceD("send-log-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "point-count": len(metrics), "dd-response": acc.Status})
+			if res.StatusCode != 202 || err != nil {
+				// Make a best attempt at reading the body, if we error here then ¯\_(ツ)_/¯
+				b, _ := ioutil.ReadAll(res.Body)
+				return fmt.Errorf("status code %d received from DD api Err = %v RawBody = %s", res.StatusCode, err, b)
+			}
+			return nil
+		})
+		if err != nil {
+			lg.ErrorD("failed-sending-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "error": err.Error()})
+		}
+	}()
 }

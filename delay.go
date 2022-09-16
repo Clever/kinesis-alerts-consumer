@@ -5,6 +5,10 @@ import (
 	"time"
 )
 
+// Generally you want to steer clear of sync/atomic, but simple numbers like this where
+// you are concurrently storing a usage statistic is one of the few cases where it
+// makes sense over a mutex. atomic does not provide read/write ordering guarantees
+// which don't matter here as much as general trends do.
 var maxDelay int64 = 0
 
 func updateMaxDelay(ts []time.Time) {
