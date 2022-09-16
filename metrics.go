@@ -20,8 +20,9 @@ type envAppTeam struct {
 }
 
 type logRoute struct {
-	app  string
-	name string
+	app      string
+	env      string
+	ruleName string
 }
 
 type volume struct {
@@ -37,7 +38,7 @@ type work struct {
 
 var (
 	envAppTeamVolumes = map[envAppTeam]volume{}
-	logRouteVolumes   = map[logRoute]volume{}
+	logRouteVolumes   = map[logRoute]int{}
 	retry             = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
 	// 10000 is hopefully sufficiently large to prevent metrics recording from blocking
 	chMetrics = make(chan work, 10000)
@@ -60,43 +61,49 @@ func recordMetrics(env, app, team string, numBytes int, routeNames []string) {
 
 	for _, n := range routeNames {
 		chMetrics <- work{
-			lr:   &logRoute{app, n},
-			size: numBytes,
+			lr: &logRoute{app, env, n},
 		}
 	}
 }
 
+// processMetrics aggregates all metrics sent over the channel by recordMetrics. On the interval of the ticker
+// the aggregates will be shipped to DD and reset
 func processMetrics(dd DDMetricsAPI, tic <-chan time.Time) {
 	for {
 		select {
 		case <-tic:
-			logVolumesAndReset(dd)
+			shipMetrics(dd)
 		case w := <-chMetrics:
 			if w.eat != nil {
 				vol := envAppTeamVolumes[*w.eat]
 				envAppTeamVolumes[*w.eat] = volume{vol.count + 1, vol.size + w.size}
 			}
 			if w.lr != nil {
-				vol := logRouteVolumes[*w.lr]
-				logRouteVolumes[*w.lr] = volume{vol.count + 1, vol.size + w.size}
+				n := logRouteVolumes[*w.lr]
+				logRouteVolumes[*w.lr] = n + 1
 			}
 		}
 	}
 }
 
-func logVolumesAndReset(dd DDMetricsAPI) {
-	logVolumesCopy := envAppTeamVolumes
+func shipMetrics(dd DDMetricsAPI) {
+	eatCopy := envAppTeamVolumes
 	envAppTeamVolumes = map[envAppTeam]volume{}
+
+	lrCopy := logRouteVolumes
+	logRouteVolumes = map[logRoute]int{}
 
 	// do work that involves network calls async
 	go func() {
-		var metrics []datadog.MetricSeries
-		var totalCount, totalSize int
-		for eat, vol := range logVolumesCopy {
+		var (
+			metrics               []datadog.MetricSeries
+			totalCount, totalSize int
+		)
+		for eat, vol := range eatCopy {
 			tags := []string{
-				fmt.Sprintf("env:%s", eat.env),
-				fmt.Sprintf("application:%s", eat.app),
-				fmt.Sprintf("team:%s", eat.team),
+				"env:" + eat.env,
+				"application:" + eat.app,
+				"team:" + eat.team,
 			}
 			metrics = append(metrics,
 				datadog.MetricSeries{
@@ -125,6 +132,28 @@ func logVolumesAndReset(dd DDMetricsAPI) {
 			totalCount += vol.count
 			totalSize += vol.size
 		}
+
+		for lr, n := range lrCopy {
+			tags := []string{
+				"env:" + lr.env,
+				"application:" + lr.app,
+				"route:" + lr.ruleName,
+			}
+			metrics = append(metrics,
+				datadog.MetricSeries{
+					Metric: "kinesis-consumer.log-route-count",
+					Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
+					Tags:   tags,
+					Points: []datadog.MetricPoint{
+						{
+							Timestamp: datadog.PtrInt64(time.Now().Unix()),
+							Value:     aws.Float64(float64(n)),
+						},
+					},
+				},
+			)
+		}
+
 		err := retry.Run(func() error {
 			acc, res, err := dd.SubmitMetrics(datadog.NewDefaultContext(context.Background()), *datadog.NewMetricPayload(metrics))
 			lg.TraceD("send-log-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "point-count": len(metrics), "dd-response": acc.Status})
