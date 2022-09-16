@@ -25,10 +25,6 @@ func updateMaxDelay(ts []time.Time) {
 	}
 }
 
-func isRecent(t time.Time, allowedDelay time.Duration) bool {
-	return time.Since(t) <= allowedDelay
-}
-
 func logMaxDelayThenReset() {
 	lg.GaugeFloat("max-log-delay", time.Duration(atomic.LoadInt64(&maxDelay)).Seconds())
 	// Reset
