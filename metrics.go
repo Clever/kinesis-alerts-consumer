@@ -44,6 +44,7 @@ var (
 	chMetrics = make(chan work, 10000)
 )
 
+// A thread safe way to record metrics pipeline metrics.
 func recordMetrics(env, app, team string, numBytes int, routeNames []string) {
 	if env == "" {
 		env = "unknown"
@@ -67,7 +68,8 @@ func recordMetrics(env, app, team string, numBytes int, routeNames []string) {
 }
 
 // processMetrics aggregates all metrics sent over the channel by recordMetrics. On the interval of the ticker
-// the aggregates will be shipped to DD and reset
+// the aggregates will be shipped to DD and reset. Process is not thread safe and should only be run by one
+// goroutine.
 func processMetrics(dd DDMetricsAPI, tic <-chan time.Time) {
 	for {
 		select {
