@@ -278,14 +278,12 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	}
 
 	// only send to Cloudwatch if the tag is an AWS region
-	if tag == "us-west-1" || tag == "us-west-2" || tag == "us-east-1" || tag == "us-east-2" {
+	if api, ok := c.cwAPIs[tag]; ok {
 		lg.TraceD("cloudwatch-add-datapoints", logger.M{"point-count": len(dats)})
-		cw := c.cwAPIs[tag]
-		_, err = cw.PutMetricData(&cloudwatch.PutMetricDataInput{
+		_, err = api.PutMetricData(&cloudwatch.PutMetricDataInput{
 			Namespace:  aws.String(cloudwatchNamespace),
 			MetricData: dats,
 		})
-		// TODO: We could return that we failed to process this batch (as above) but for now just log
 		if err != nil {
 			lg.ErrorD("error-sending-to-cloudwatch", logger.M{"error": err.Error()})
 		}
