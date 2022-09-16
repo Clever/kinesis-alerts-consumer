@@ -125,7 +125,7 @@ func logVolumesAndReset(dd DDMetricsAPI) {
 			totalSize += vol.size
 		}
 		err := retry.Run(func() error {
-			acc, res, err := dd.SubmitMetrics(context.Background(), *datadog.NewMetricPayload(metrics))
+			acc, res, err := dd.SubmitMetrics(datadog.NewDefaultContext(context.Background()), *datadog.NewMetricPayload(metrics))
 			lg.TraceD("send-log-volumes", logger.M{"total-logs": totalCount, "total-size": totalSize, "point-count": len(metrics), "dd-response": acc.Status})
 			if res.StatusCode != 202 || err != nil {
 				// Make a best attempt at reading the body, if we error here then ¯\_(ツ)_/¯

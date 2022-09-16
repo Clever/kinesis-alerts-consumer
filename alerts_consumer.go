@@ -128,37 +128,28 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 		tags := []string{}
 		cwDims := []*cloudwatch.Dimension{}
 		for _, dim := range route.Dimensions {
-			dimVal, ok := fields[dim]
-			if ok {
+			if dimVal, ok := fields[dim]; ok {
+				var val string
 				switch t := dimVal.(type) {
 				case string:
-					tags = append(tags, fmt.Sprintf("%s:%s", dim, t))
-					if !contains(defaultDimensions, dim) {
-						cwDims = append(cwDims, &cloudwatch.Dimension{
-							Name:  aws.String(dim),
-							Value: &t,
-						})
-					}
+					val = t
 				case float64:
 					// Drop data after the decimal and cast to string (ex. 3.2 => "3")
-					val := fmt.Sprintf("%.0f", t)
-					tags = append(tags, fmt.Sprintf("%s:%s", dim, val))
-					cwDims = append(cwDims, &cloudwatch.Dimension{
-						Name:  aws.String(dim),
-						Value: &val,
-					})
+					val = fmt.Sprintf("%.0f", t)
 				case bool:
-					val := fmt.Sprintf("%t", t)
-					tags = append(tags, fmt.Sprintf("%s:%s", dim, val))
-					cwDims = append(cwDims, &cloudwatch.Dimension{
-						Name:  aws.String(dim),
-						Value: &val,
-					})
+					val = fmt.Sprintf("%t", t)
 				default:
 					return []byte{}, []string{}, fmt.Errorf(
 						"error casting dimension value. rule=%s dim=%s val=%s",
 						route.RuleName, dim, dimVal,
 					)
+				}
+				tags = append(tags, fmt.Sprintf("%s:%s", dim, val))
+				if !contains(defaultDimensions, dim) {
+					cwDims = append(cwDims, &cloudwatch.Dimension{
+						Name:  aws.String(dim),
+						Value: &val,
+					})
 				}
 			}
 		}
