@@ -9,9 +9,9 @@ var maxDelay int64 = 0
 
 func updateMaxDelay(ts []time.Time) {
 	cur := atomic.LoadInt64(&maxDelay)
-	// If a timestamp is set
 	var max int64
 	for _, t := range ts {
+		// If a timestamp is set
 		if (t != time.Time{}) {
 			// how long ago is the log from?
 			lag := int64(time.Since(t))
