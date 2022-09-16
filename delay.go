@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
-var maxDelay = atomic.Int64{}
+var maxDelay int64 = 0
 
 func updateMaxDelay(ts []time.Time) {
-	cur := maxDelay.Load()
+	cur := atomic.LoadInt64(&maxDelay)
 	// If a timestamp is set
 	var max int64
 	for _, t := range ts {
@@ -21,7 +21,7 @@ func updateMaxDelay(ts []time.Time) {
 		}
 	}
 	if max > cur {
-		maxDelay.Store(max)
+		atomic.StoreInt64(&maxDelay, max)
 	}
 }
 
@@ -30,7 +30,7 @@ func isRecent(t time.Time, allowedDelay time.Duration) bool {
 }
 
 func logMaxDelayThenReset() {
-	lg.GaugeFloat("max-log-delay", time.Duration(maxDelay.Load()).Seconds())
+	lg.GaugeFloat("max-log-delay", time.Duration(atomic.LoadInt64(&maxDelay)).Seconds())
 	// Reset
-	maxDelay.Store(0)
+	atomic.StoreInt64(&maxDelay, 0)
 }
