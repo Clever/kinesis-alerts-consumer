@@ -200,7 +200,6 @@ func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
 }
 
 func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
-	t.Log("message error if trying to cast unknown type as SFX dimension")
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
@@ -229,7 +228,6 @@ func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
 }
 
 func TestEncodeMessageErrorsIfValueExistsAndIsInvalidType(t *testing.T) {
-	t.Log("message error if trying to cast unknown type as SFX dimension")
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",

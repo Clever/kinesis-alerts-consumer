@@ -58,8 +58,6 @@ func main() {
 		ReadRateLimit:  getIntEnv("READ_RATE_LIMIT"),
 	}
 
-	// TODO: drop SFX env vars?
-
 	cwAPIs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-1")})),
 		"us-west-2": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-2")})),
