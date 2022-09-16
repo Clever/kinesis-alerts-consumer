@@ -35,3 +35,11 @@ deploy_config:
   autoDeployEnvs:
   - dev-infra
   - production
+telemetry:
+  enabled: true
+  tracing:
+    exporters:
+    - datadog
+  metrics:
+    exporters:
+    - datadog
