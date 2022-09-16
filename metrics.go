@@ -39,7 +39,8 @@ var (
 	envAppTeamVolumes = map[envAppTeam]volume{}
 	logRouteVolumes   = map[logRoute]volume{}
 	retry             = retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
-	chMetrics         = make(chan work, 10000)
+	// 10000 is hopefully sufficiently large to prevent metrics recording from blocking
+	chMetrics = make(chan work, 10000)
 )
 
 func recordMetrics(env, app, team string, numBytes int, routeNames []string) {
