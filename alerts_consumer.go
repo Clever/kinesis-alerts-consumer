@@ -144,7 +144,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 						route.RuleName, dim, dimVal,
 					)
 				}
-				tags = append(tags, fmt.Sprintf("%s:%s", dim, val))
+				tags = append(tags, dim+":"+val)
 				if !contains(defaultDimensions, dim) {
 					cwDims = append(cwDims, &cloudwatch.Dimension{
 						Name:  aws.String(dim),
