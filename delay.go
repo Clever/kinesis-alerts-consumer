@@ -22,7 +22,7 @@ func updateMaxDelay(ts []time.Time) {
 		if (t != time.Time{}) {
 			// how long ago is the log from?
 			lag := int64(time.Since(t))
-			if lag > cur {
+			if lag > max {
 				max = lag
 			}
 		}
@@ -32,7 +32,7 @@ func updateMaxDelay(ts []time.Time) {
 	}
 }
 
-func logMaxDelayThenReset() {
+func logMaxDelay() {
 	// Reset the value
 	val := atomic.SwapInt64(&maxDelay, 0)
 	lg.GaugeFloat("max-log-delay", time.Duration(val).Seconds())

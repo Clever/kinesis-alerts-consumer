@@ -72,7 +72,7 @@ func main() {
 	// Track Max Delay
 	go func() {
 		for range time.Tick(15 * time.Second) {
-			logMaxDelayThenReset()
+			logMaxDelay()
 		}
 	}()
 
