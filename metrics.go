@@ -10,7 +10,7 @@ import (
 	"github.com/eapache/go-resiliency/retrier"
 	"golang.org/x/net/context"
 
-	"gopkg.in/Clever/kayvee-go.v6/logger"
+	"github.com/Clever/kayvee-go/v7/logger"
 )
 
 type envAppTeam struct {
@@ -109,7 +109,7 @@ func shipMetrics(dd DDMetricsAPI) {
 			}
 			metrics = append(metrics,
 				datadog.MetricSeries{
-					Metric: "kinesis-consumer.log-volume-count",
+					Metric: "kinesis_alerts_consumer.log_volume_count",
 					Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
 					Tags:   tags,
 					Points: []datadog.MetricPoint{
@@ -120,7 +120,7 @@ func shipMetrics(dd DDMetricsAPI) {
 					},
 				},
 				datadog.MetricSeries{
-					Metric: "kinesis-consumer.log-volume-size",
+					Metric: "kinesis_alerts_consumer.log_volume_size",
 					Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
 					Tags:   tags,
 					Points: []datadog.MetricPoint{
@@ -143,7 +143,7 @@ func shipMetrics(dd DDMetricsAPI) {
 			}
 			metrics = append(metrics,
 				datadog.MetricSeries{
-					Metric: "kinesis-consumer.log-route-count",
+					Metric: "kinesis_alerts_consumer.log_route_count",
 					Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
 					Tags:   tags,
 					Points: []datadog.MetricPoint{
