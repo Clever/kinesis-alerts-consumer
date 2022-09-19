@@ -10,7 +10,7 @@ import (
 	"github.com/eapache/go-resiliency/retrier"
 	"golang.org/x/net/context"
 
-	"gopkg.in/Clever/kayvee-go.v6/logger"
+	"github.com/Clever/kayvee-go/v7/logger"
 )
 
 type envAppTeam struct {

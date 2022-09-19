@@ -12,11 +12,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
+	"github.com/Clever/kayvee-go/v7/logger"
 	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/kardianos/osext"
-	"gopkg.in/Clever/kayvee-go.v6/logger"
 )
 
 // getEnv returns required environment variable
