@@ -35,5 +35,5 @@ func updateMaxDelay(ts []time.Time) {
 func logMaxDelay() {
 	// Reset the value
 	val := atomic.SwapInt64(&maxDelay, 0)
-	lg.GaugeFloat("max-log-delay", time.Duration(val).Seconds())
+	lg.GaugeFloat("max_log_delay", time.Duration(val).Seconds())
 }
