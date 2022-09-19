@@ -7,7 +7,6 @@ env:
 - KINESIS_APPLICATION_NAME
 - KINESIS_INITIAL_POSITION
 - READ_RATE_LIMIT
-- SFX_API_TOKEN
 - DD_API_KEY
 resources:
   cpu: 4
@@ -36,3 +35,11 @@ deploy_config:
   autoDeployEnvs:
   - dev-infra
   - production
+telemetry:
+  enabled: true
+  tracing:
+    exporters:
+    - datadog
+  metrics:
+    exporters:
+    - datadog

@@ -1,35 +1,39 @@
 package main
 
 import (
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
-var maxDelay = 0 * time.Millisecond
-var maxDelayLock = sync.RWMutex{}
+// Generally you want to steer clear of sync/atomic, but simple numbers like this where
+// you are concurrently storing a usage statistic is one of the few cases where it
+// makes sense over a mutex. atomic does not provide read/write ordering guarantees
+// which don't matter here as much as general trends do. Be very careful about
+// any changes, as there are a lot of hidden gotchas when working with atomic values.
+// Read in detail the discussion here:
+// https://stackoverflow.com/questions/47445344/is-there-a-difference-in-go-between-a-counter-using-atomic-operations-and-one-us
+var maxDelay int64 = 0
 
-func updateMaxDelay(t time.Time) {
-	maxDelayLock.Lock()
-	defer maxDelayLock.Unlock()
-
-	// If a timestamp is set
-	if (t != time.Time{}) {
-		// how long ago is the log from?
-		lag := time.Now().Sub(t)
-		if lag > maxDelay {
-			maxDelay = lag
+func updateMaxDelay(ts []time.Time) {
+	cur := atomic.LoadInt64(&maxDelay)
+	var max int64
+	for _, t := range ts {
+		// If a timestamp is set
+		if (t != time.Time{}) {
+			// how long ago is the log from?
+			lag := int64(time.Since(t))
+			if lag > max {
+				max = lag
+			}
 		}
+	}
+	if max > cur {
+		atomic.StoreInt64(&maxDelay, max)
 	}
 }
 
-func isRecent(t time.Time, allowedDelay time.Duration) bool {
-	return time.Now().Sub(t) <= allowedDelay
-}
-
-func logMaxDelayThenReset() {
-	maxDelayLock.Lock()
-	defer maxDelayLock.Unlock()
-	lg.GaugeFloat("max-log-delay", maxDelay.Seconds())
-	// Reset
-	maxDelay = 0
+func logMaxDelay() {
+	// Reset the value
+	val := atomic.SwapInt64(&maxDelay, 0)
+	lg.GaugeFloat("max-log-delay", time.Duration(val).Seconds())
 }

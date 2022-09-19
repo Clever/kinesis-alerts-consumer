@@ -10,8 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
 	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
-	"github.com/signalfx/golib/datapoint"
-	"github.com/signalfx/golib/event"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -28,28 +26,29 @@ func TestProcessMessage(t *testing.T) {
 	assert.Equal(t, expectedTags, tags)
 
 	// Verify the message
-	t.Log("verify the message")
 	eo := EncodeOutput{}
 	err = json.Unmarshal(msg, &eo)
 	assert.NoError(t, err)
 
-	expectedPts := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
-			Metric: "oauth.login_start",
-			Dimensions: map[string]string{
-				"district":    "ddd",
-				"title":       "login_start",
-				"auth_method": "auth",
-				"Hostname":    "my-hostname",
-				"env":         "test-env",
+	expectedPts := []datadog.MetricSeries{
+		{
+			Metric: "kv.oauth.login_start",
+			Tags: []string{
+				"district:ddd",
+				"title:login_start",
+				"auth_method:auth",
+				"Hostname:my-hostname",
+				"env:test-env",
 			},
-			Value:      datapoint.NewIntValue(1),
-			MetricType: datapoint.Counter,
-			Timestamp:  time.Unix(1502822347, 0).UTC(),
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(1),
+				Timestamp: aws.Int64(1502822347),
+			}},
+			Type: datadog.METRICINTAKETYPE_COUNT.Ptr(),
 		},
 	}
 
-	assert.Equal(t, expectedPts, eo.Datapoints)
+	assert.Equal(t, expectedPts, eo.DDMetrics)
 }
 
 func TestProcessMessageSupportsCloudwatch(t *testing.T) {
@@ -64,31 +63,27 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 	assert.Equal(t, expectedTags, tags)
 
 	// Verify the message
-	t.Log("verify the message")
 	eo := EncodeOutput{}
 	err = json.Unmarshal(msg, &eo)
 	assert.NoError(t, err)
 
 	timestamp, _ := time.Parse(time.RFC3339Nano, "2017-08-15T18:39:07.000000Z")
 	expected := EncodeOutput{
-		Datapoints: []*datapoint.Datapoint{
-			&datapoint.Datapoint{
-				Metric: "ContainerExitCount",
-				Dimensions: map[string]string{
-					"Hostname":   "my-hostname",
-					"env":        "test-env",
-					"dimension1": "dim",
+		DDMetrics: []datadog.MetricSeries{{
+			Metric: "kv.ContainerExitCount",
+			Type:   datadog.METRICINTAKETYPE_COUNT.Ptr(),
+			Tags:   []string{"dimension1:dim", "Hostname:my-hostname", "env:test-env"},
+			Points: []datadog.MetricPoint{
+				{
+					Timestamp: datadog.PtrInt64(timestamp.Unix()),
+					Value:     aws.Float64(1),
 				},
-				Value:      datapoint.NewIntValue(1),
-				MetricType: datapoint.Counter,
-				Timestamp:  timestamp,
 			},
-		},
-		Events: []*event.Event{},
-		MetricData: []*cloudwatch.MetricDatum{
-			&cloudwatch.MetricDatum{
+		}},
+		CWMetrics: []*cloudwatch.MetricDatum{
+			{
 				Dimensions: []*cloudwatch.Dimension{
-					&cloudwatch.Dimension{
+					{
 						Name:  aws.String("dimension1"),
 						Value: aws.String("dim"),
 					},
@@ -106,7 +101,6 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 
 // TestEncodeMessage tests the encodeMessage() helper used in ProcessMessage()
 func TestEncodeMessage(t *testing.T) {
-	t.Log("writes a single Counter as a datapoint")
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
@@ -115,7 +109,7 @@ func TestEncodeMessage(t *testing.T) {
 		"dim_b":     "dim_b_val",
 		"Hostname":  "my-hostname",
 		"env":       "my-env",
-		"timestamp": time.Time{},
+		"timestamp": time.Unix(0, 0),
 		"_kvmeta": map[string]interface{}{
 			"routes": []interface{}{
 				map[string]interface{}{
@@ -135,30 +129,24 @@ func TestEncodeMessage(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
 
-	expectedPts := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
-			Metric: "series-name",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
-			},
-			Value:      datapoint.NewIntValue(123),
-			MetricType: datapoint.Counter,
-			Timestamp:  time.Time{},
-		},
-	}
+	expectedPts := []datadog.MetricSeries{{
+		Metric: "kv.series-name",
+		Tags:   []string{"dim_a:dim_a_val", "dim_b:dim_b_val", "Hostname:my-hostname", "env:my-env"},
+		Points: []datadog.MetricPoint{{
+			Value:     aws.Float64(123),
+			Timestamp: aws.Int64(0),
+		}},
+		Type: datadog.METRICINTAKETYPE_COUNT.Ptr(),
+	}}
 
 	eo := EncodeOutput{}
 	err = json.Unmarshal(output, &eo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedPts, eo.Datapoints)
+	assert.Equal(t, expectedPts, eo.DDMetrics)
 }
 
 func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
-	t.Log("is able to write SFX dimensions from JSON fields which have float or bool values")
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
@@ -168,7 +156,7 @@ func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
 		"dim_bool":  true,
 		"Hostname":  "my-hostname",
 		"env":       "my-env",
-		"timestamp": time.Time{},
+		"timestamp": time.Unix(0, 0),
 		"_kvmeta": map[string]interface{}{
 			"routes": []interface{}{
 				map[string]interface{}{
@@ -188,31 +176,30 @@ func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
 
-	expectedPts := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
-			Metric: "series-name",
-			Dimensions: map[string]string{
-				"dim_a":     "dim_a_val",
-				"dim_float": "3",
-				"dim_bool":  "true",
-				"Hostname":  "my-hostname",
-				"env":       "my-env",
-			},
-			Value:      datapoint.NewIntValue(123),
-			MetricType: datapoint.Counter,
-			Timestamp:  time.Time{},
+	expectedPts := []datadog.MetricSeries{{
+		Metric: "kv.series-name",
+		Tags: []string{
+			"dim_a:dim_a_val",
+			"dim_float:3",
+			"dim_bool:true",
+			"Hostname:my-hostname",
+			"env:my-env",
 		},
-	}
+		Points: []datadog.MetricPoint{{
+			Value:     aws.Float64(123),
+			Timestamp: aws.Int64(0),
+		}},
+		Type: datadog.METRICINTAKETYPE_COUNT.Ptr(),
+	}}
 
 	eo := EncodeOutput{}
 	err = json.Unmarshal(output, &eo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedPts, eo.Datapoints)
+	assert.Equal(t, expectedPts, eo.DDMetrics)
 }
 
 func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
-	t.Log("message error if trying to cast unknown type as SFX dimension")
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
@@ -241,7 +228,6 @@ func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
 }
 
 func TestEncodeMessageErrorsIfValueExistsAndIsInvalidType(t *testing.T) {
-	t.Log("message error if trying to cast unknown type as SFX dimension")
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
@@ -269,7 +255,6 @@ func TestEncodeMessageErrorsIfValueExistsAndIsInvalidType(t *testing.T) {
 }
 
 func TestEncodeMessageWithGauge(t *testing.T) {
-	t.Log("writes a single Gauge as a datapoint")
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
@@ -278,7 +263,7 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 		"dim_b":     "dim_b_val",
 		"Hostname":  "my-hostname",
 		"env":       "my-env",
-		"timestamp": time.Time{},
+		"timestamp": time.Unix(0, 0),
 		"_kvmeta": map[string]interface{}{
 			"routes": []interface{}{
 				map[string]interface{}{
@@ -298,31 +283,27 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
 
-	expectedPts := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
-			Metric: "series-name",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+	expectedPts := []datadog.MetricSeries{{
+		Metric: "kv.series-name",
+		Type:   datadog.METRICINTAKETYPE_GAUGE.Ptr(),
+		Tags:   []string{"dim_a:dim_a_val", "dim_b:dim_b_val", "Hostname:my-hostname", "env:my-env"},
+		Points: []datadog.MetricPoint{
+			{
+				Timestamp: datadog.PtrInt64(0),
+				Value:     aws.Float64(9.5),
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
 		},
-	}
+	}}
 
 	eo := EncodeOutput{}
 	err = json.Unmarshal(output, &eo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedPts[0].Value, eo.Datapoints[0].Value)
-	assert.Equal(t, expectedPts, eo.Datapoints)
+	assert.Equal(t, expectedPts[0].Points[0].Value, eo.DDMetrics[0].Points[0].Value)
+	assert.Equal(t, expectedPts, eo.DDMetrics)
 }
 
 func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
-	t.Log("If message has multiple routes, it will write multiple datapoints")
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
@@ -331,7 +312,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 		"dim_b":     "dim_b_val",
 		"Hostname":  "my-hostname",
 		"env":       "my-env",
-		"timestamp": time.Time{},
+		"timestamp": time.Unix(0, 0),
 		"_kvmeta": map[string]interface{}{
 			"routes": []interface{}{
 				map[string]interface{}{
@@ -359,30 +340,34 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 	assert.Equal(t, 1, len(tags))
 	assert.Equal(t, string("default"), tags[0])
 
-	expectedPts := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
-			Metric: "series-name",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+	expectedPts := []datadog.MetricSeries{
+		{
+			Metric: "kv.series-name",
+			Tags: []string{
+				"dim_a:dim_a_val",
+				"dim_b:dim_b_val",
+				"Hostname:my-hostname",
+				"env:my-env",
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
 		},
-		&datapoint.Datapoint{
-			Metric: "series-name-2",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+		{
+			Metric: "kv.series-name-2",
+			Tags: []string{
+				"dim_a:dim_a_val",
+				"dim_b:dim_b_val",
+				"Hostname:my-hostname",
+				"env:my-env",
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
 		},
 	}
 
@@ -390,8 +375,8 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 	err = json.Unmarshal(output, &eo)
 	assert.NoError(t, err)
 
-	assert.Equal(t, expectedPts[0].Value, eo.Datapoints[0].Value)
-	assert.Equal(t, expectedPts, eo.Datapoints)
+	assert.Equal(t, expectedPts[0].Points[0].Value, eo.DDMetrics[0].Points[0].Value)
+	assert.Equal(t, expectedPts, eo.DDMetrics)
 }
 
 func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
@@ -418,25 +403,6 @@ func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
 	assert.Contains(t, err.Error(), "intentionally skipped")
 }
 
-type MockHTTPSink struct {
-	pts  []*datapoint.Datapoint
-	evts []*event.Event
-}
-
-func (s *MockHTTPSink) AddDatapoints(ctx context.Context, points []*datapoint.Datapoint) (err error) {
-	for _, p := range points {
-		s.pts = append(s.pts, p)
-	}
-	return nil
-}
-
-func (s *MockHTTPSink) AddEvents(ctx context.Context, events []*event.Event) (err error) {
-	for _, e := range events {
-		s.evts = append(s.evts, e)
-	}
-	return nil
-}
-
 type MockCW struct {
 	cloudwatchiface.CloudWatchAPI
 	inputs []*cloudwatch.PutMetricDataInput
@@ -449,106 +415,110 @@ func (cw *MockCW) PutMetricData(input *cloudwatch.PutMetricDataInput) (*cloudwat
 
 type MockDD struct {
 	DDMetricsAPI
-	inputs []datadog.MetricPayload
+	inputs []datadog.MetricSeries
 }
 
 func (dd *MockDD) SubmitMetrics(ctx context.Context, body datadog.MetricPayload, o ...datadog.SubmitMetricsOptionalParameters) (datadog.IntakePayloadAccepted, *http.Response, error) {
-	dd.inputs = append(dd.inputs, body)
+	dd.inputs = append(dd.inputs, body.Series...)
 	return datadog.IntakePayloadAccepted{}, nil, nil
 }
 
 func TestSendBatch(t *testing.T) {
-	pts := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
+	pts := []datadog.MetricSeries{
+		{
 			Metric: "series-name",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+			Tags: []string{
+				"dim_a:dim_a_val",
+				"dim_b:dim_b_val",
+				"Hostname:my-hostname",
+				"env:my-env",
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
 		},
-		&datapoint.Datapoint{
+		{
 			Metric: "series-name-2",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+			Tags: []string{
+				"dim_a:dim_a_val",
+				"dim_b:dim_b_val",
+				"Hostname:my-hostname",
+				"env:my-env",
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
 		},
 	}
-	pts2 := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
+	pts2 := []datadog.MetricSeries{
+		{
 			Metric: "series-name-3",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+			Tags: []string{
+				"dim_a:dim_a_val",
+				"dim_b:dim_b_val",
+				"Hostname:my-hostname",
+				"env:my-env",
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
 		},
-		&datapoint.Datapoint{
-			Metric:     "series-name-4",
-			Dimensions: map[string]string{"dim_a": "dim_a_val"},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+		{
+			Metric: "series-name-4",
+			Tags:   []string{"dim_a:dim_a_val"},
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
 		},
 	}
 
 	b, err := json.Marshal(EncodeOutput{
-		Datapoints: pts,
+		DDMetrics: pts,
 	})
 	assert.NoError(t, err)
 	input := [][]byte{b}
 
 	b2, err := json.Marshal(EncodeOutput{
-		Datapoints: pts2,
+		DDMetrics: pts2,
 	})
 	assert.NoError(t, err)
 	input2 := [][]byte{b2}
 
-	mockSink := &MockHTTPSink{}
 	mockCWUSWest1 := &MockCW{}
 	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": mockCWUSWest1,
 	}
 	mockDD := &MockDD{}
 	consumer := AlertsConsumer{
-		sfxSink: mockSink,
-		cwAPIs:  mockCWs,
-		dd:      mockDD,
+		cwAPIs: mockCWs,
+		dd:     mockDD,
 	}
-	t.Log("Send first batch")
 	err = consumer.SendBatch(input, "default")
 	assert.NoError(t, err)
-	assert.Equal(t, append(pts), mockSink.pts)
+	assert.Equal(t, append(pts), mockDD.inputs)
 
-	t.Log("Send second batch")
 	err = consumer.SendBatch(input2, "default")
 	assert.NoError(t, err)
-	assert.Equal(t, append(pts, pts2...), mockSink.pts)
+	assert.Equal(t, append(pts, pts2...), mockDD.inputs)
 }
 
 func TestSendBatchToCloudwatch(t *testing.T) {
 	dats := []*cloudwatch.MetricDatum{
-		&cloudwatch.MetricDatum{
+		{
 			Dimensions: []*cloudwatch.Dimension{
-				&cloudwatch.Dimension{
+				{
 					Name:  aws.String("Hostname"),
 					Value: aws.String("my-hostname"),
 				},
-				&cloudwatch.Dimension{
+				{
 					Name:  aws.String("env"),
 					Value: aws.String("test-env"),
 				},
@@ -556,13 +526,13 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 			MetricName: aws.String("series-1"),
 			Value:      aws.Float64(1),
 		},
-		&cloudwatch.MetricDatum{
+		{
 			Dimensions: []*cloudwatch.Dimension{
-				&cloudwatch.Dimension{
+				{
 					Name:  aws.String("Hostname"),
 					Value: aws.String("my-hostname"),
 				},
-				&cloudwatch.Dimension{
+				{
 					Name:  aws.String("env"),
 					Value: aws.String("test-env"),
 				},
@@ -573,16 +543,16 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	}
 
 	expected := []*cloudwatch.PutMetricDataInput{
-		&cloudwatch.PutMetricDataInput{
+		{
 			Namespace: aws.String("LogMetrics"),
 			MetricData: []*cloudwatch.MetricDatum{
-				&cloudwatch.MetricDatum{
+				{
 					Dimensions: []*cloudwatch.Dimension{
-						&cloudwatch.Dimension{
+						{
 							Name:  aws.String("Hostname"),
 							Value: aws.String("my-hostname"),
 						},
-						&cloudwatch.Dimension{
+						{
 							Name:  aws.String("env"),
 							Value: aws.String("test-env"),
 						},
@@ -590,13 +560,13 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 					MetricName: aws.String("series-1"),
 					Value:      aws.Float64(1),
 				},
-				&cloudwatch.MetricDatum{
+				{
 					Dimensions: []*cloudwatch.Dimension{
-						&cloudwatch.Dimension{
+						{
 							Name:  aws.String("Hostname"),
 							Value: aws.String("my-hostname"),
 						},
-						&cloudwatch.Dimension{
+						{
 							Name:  aws.String("env"),
 							Value: aws.String("test-env"),
 						},
@@ -609,21 +579,19 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	}
 
 	b, err := json.Marshal(EncodeOutput{
-		MetricData: dats,
+		CWMetrics: dats,
 	})
 	assert.NoError(t, err)
 	input := [][]byte{b}
 
-	mockSink := &MockHTTPSink{}
 	mockCWUSWest1 := &MockCW{}
 	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": mockCWUSWest1,
 	}
 	mockDD := &MockDD{}
 	consumer := AlertsConsumer{
-		sfxSink: mockSink,
-		cwAPIs:  mockCWs,
-		dd:      mockDD,
+		cwAPIs: mockCWs,
+		dd:     mockDD,
 	}
 	t.Log("Send batch")
 	err = consumer.SendBatch(input, "us-west-1")
@@ -632,139 +600,88 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 }
 
 func TestSendBatchWithMultipleEntries(t *testing.T) {
-	pts := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
-			Metric: "series-name",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+	pts := []datadog.MetricSeries{
+		{
+			Metric: "kv.series-name",
+			Tags: []string{
+				"dim_a:dim_a_val",
+				"dim_b:dim_b_val",
+				"Hostname:my-hostname",
+				"env:my-env",
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
 		},
-		&datapoint.Datapoint{
-			Metric: "series-name-2",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+		{
+			Metric: "kv.series-name-2",
+			Tags: []string{
+				"dim_a:dim_a_val",
+				"dim_b:dim_b_val",
+				"Hostname:my-hostname",
+				"env:my-env",
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
 		},
 	}
-	pts2 := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
-			Metric: "series-name-3",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
+	pts2 := []datadog.MetricSeries{
+		{
+			Metric: "kv.series-name-3",
+			Tags: []string{
+				"dim_a:dim_a_val",
+				"dim_b:dim_b_val",
+				"Hostname:my-hostname",
+				"env:my-env",
 			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
 		},
-		&datapoint.Datapoint{
-			Metric:     "series-name-4",
-			Dimensions: map[string]string{"dim_a": "dim_a_val"},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  time.Time{},
+		{
+			Metric: "kv.series-name-4",
+			Tags:   []string{"dim_a:dim_a_val"},
+			Points: []datadog.MetricPoint{{
+				Value:     aws.Float64(9.5),
+				Timestamp: aws.Int64(0),
+			}},
+			Type: datadog.METRICINTAKETYPE_GAUGE.Ptr(),
 		},
 	}
 
 	b, err := json.Marshal(EncodeOutput{
-		Datapoints: pts,
+		DDMetrics: pts,
 	})
 	assert.NoError(t, err)
 
 	b2, err := json.Marshal(EncodeOutput{
-		Datapoints: pts2,
+		DDMetrics: pts2,
 	})
 	assert.NoError(t, err)
 
 	input := [][]byte{b, b2}
 
-	mockSink := &MockHTTPSink{}
 	mockCWUSWest1 := MockCW{}
 	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
 		"us-west-1": &mockCWUSWest1,
 	}
 	mockDD := &MockDD{}
 	consumer := AlertsConsumer{
-		sfxSink: mockSink,
-		cwAPIs:  mockCWs,
-		dd:      mockDD,
+		cwAPIs: mockCWs,
+		dd:     mockDD,
 	}
 	t.Log("Send batch with multiple entries")
 	err = consumer.SendBatch(input, "default")
 	assert.NoError(t, err)
-	assert.Equal(t, append(pts, pts2...), mockSink.pts)
-	assert.Equal(t, datadog.METRICINTAKETYPE_GAUGE, *mockDD.inputs[0].Series[0].Type)
-	assert.Equal(t, "kv.series-name", mockDD.inputs[0].Series[0].Metric)
-	assert.Equal(t, "kv.series-name-4", mockDD.inputs[0].Series[3].Metric)
-}
-
-func TestSendBatchResetsTimeForRecentDatapoints(t *testing.T) {
-	now := time.Now().UTC()
-	oneMinuteAgo := now.Add(-1 * time.Minute)
-
-	pts := []*datapoint.Datapoint{
-		&datapoint.Datapoint{
-			Metric: "series-name",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
-			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  now, // This should be reset to time.Time{}
-		},
-		&datapoint.Datapoint{
-			Metric: "series-name-2",
-			Dimensions: map[string]string{
-				"dim_a":    "dim_a_val",
-				"dim_b":    "dim_b_val",
-				"Hostname": "my-hostname",
-				"env":      "my-env",
-			},
-			Value:      datapoint.NewFloatValue(float64(9.5)),
-			MetricType: datapoint.Gauge,
-			Timestamp:  oneMinuteAgo, // This time should not be modified
-		},
-	}
-
-	b, err := json.Marshal(EncodeOutput{
-		Datapoints: pts,
-	})
-	assert.NoError(t, err)
-	input := [][]byte{b}
-
-	mockSink := &MockHTTPSink{}
-	mockCWUSWest1 := MockCW{}
-	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
-		"us-west-1": &mockCWUSWest1,
-	}
-	mockDD := &MockDD{}
-	consumer := AlertsConsumer{
-		sfxSink: mockSink,
-		cwAPIs:  mockCWs,
-		dd:      mockDD,
-	}
-	t.Log("Send first batch")
-	err = consumer.SendBatch(input, "default")
-	assert.NoError(t, err)
-
-	t.Log("Datapoints with recent timestamps should ignore their timestamp and instead get a timestamp on arrival to SignalFX")
-	pts[0].Timestamp = time.Time{}
-	assert.Equal(t, pts, mockSink.pts)
+	assert.Equal(t, append(pts, pts2...), mockDD.inputs)
+	assert.Equal(t, datadog.METRICINTAKETYPE_GAUGE, *mockDD.inputs[0].Type)
+	assert.Equal(t, "kv.series-name", mockDD.inputs[0].Metric)
+	assert.Equal(t, "kv.series-name-4", mockDD.inputs[3].Metric)
 }
