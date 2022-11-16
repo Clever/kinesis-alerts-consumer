@@ -43,3 +43,6 @@ telemetry:
   metrics:
     exporters:
     - datadog
+mesh_config:
+  dev:
+    state: mesh_only
