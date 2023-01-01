@@ -13,3 +13,4 @@ kinesis-alerts-consumer
 jars
 bin/
 tmp-jars/
+.git/
