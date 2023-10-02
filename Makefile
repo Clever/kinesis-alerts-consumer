@@ -7,7 +7,7 @@ EXECUTABLE = kinesis-consumer
 PKG = github.com/Clever/kinesis-alerts-consumer
 PKGS := $(shell go list ./... | grep -v /vendor )
 .PHONY: download_jars run build
-$(eval $(call golang-version-check,1.16))
+$(eval $(call golang-version-check,1.21))
 
 TMP_DIR := ./tmp-jars
 JAR_DIR := ./jars
