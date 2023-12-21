@@ -30,6 +30,7 @@ aws:
     - KinesisLogsConsumer
 pod_config:
   group: us-west-1
+  devGroup: us-west-2
 deploy_config:
   canaryInProd: false
   autoDeployEnvs:
