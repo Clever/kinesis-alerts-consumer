@@ -29,12 +29,12 @@ aws:
     - CloudWatchMetricsWriter
     - KinesisLogsConsumer
 pod_config:
-  group: us-west-1
+  group: us-west-2
+  devGroup: us-west-2
 deploy_config:
   canaryInProd: false
   autoDeployEnvs:
   - dev-infra
-  - production
 telemetry:
   enabled: true
   tracing:
