@@ -49,18 +49,12 @@ build:
 docker_build: download_jars
 	GOOS=linux GOARCH=amd64 make build
 	docker build -t $(APP_NAME) .
-	docker build -t $(APP_NAME)-us-west-2 .	
 
 run: docker_build
 	@docker run \
 	-v /tmp:/tmp \
 	-v $(AWS_SHARED_CREDENTIALS_FILE):$(AWS_SHARED_CREDENTIALS_FILE) \
 	--env-file=<(echo -e $(_ARKLOC_ENV_FILE)) $(APP_NAME)
-	@docker run \
-        -v /tmp:/tmp \
-        -v $(AWS_SHARED_CREDENTIALS_FILE):$(AWS_SHARED_CREDENTIALS_FILE) \
-        --env-file=<(echo -e $(_ARKLOC_ENV_FILE)) $(APP_NAME)-us-west-2
-
 
 test: $(PKGS)
 $(PKGS): golang-test-all-deps

@@ -29,6 +29,7 @@ jobs:
         name: Install maven
     - run: make install_deps
     - run: make build
+    - run: APP_NAME=$APP_NAME-us-west-2 make build
     - run: make download_jars
     - run: make test
     - run: $HOME/ci-scripts/circleci/docker-publish $DOCKER_USER $DOCKER_PASS "$DOCKER_EMAIL" $DOCKER_ORG
