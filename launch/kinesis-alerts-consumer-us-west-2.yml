@@ -21,9 +21,9 @@ team: eng-infra
 aws:
   dynamodb:
     read:
-    - kinesis-alerts-consumer-us-west-2
+    - us-west-2:kinesis-alerts-consumer
     write:
-    - kinesis-alerts-consumer-us-west-2
+    - us-west-2:kinesis-alerts-consumer
   managed:
     clever:
     - CloudWatchMetricsWriter
