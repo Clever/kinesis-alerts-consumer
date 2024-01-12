@@ -24,7 +24,7 @@ aws:
     - kinesis-alerts-consumer
     write:
     - kinesis-alerts-consumer
-  managed:
+  managed:  # ToDo: replace managed policy with ark-config policy file
     clever:
     - CloudWatchMetricsWriter
     - KinesisLogsConsumer
