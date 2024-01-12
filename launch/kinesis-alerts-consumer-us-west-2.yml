@@ -24,6 +24,7 @@ aws:
     - us-west-2:kinesis-alerts-consumer
     write:
     - us-west-2:kinesis-alerts-consumer
+  custom: true
 pod_config:
   group: us-west-2
   devGroup: us-west-2
