@@ -26,4 +26,12 @@ routes:
       series: "kinesis-consumer.alerts.cloudwatch-error"
       dimensions: [ ]
       stat_type: "counter"
-
+  pipeline-test-alerts:
+    matchers:
+      title: ["logging-pipeline-alerts"]
+    output:
+      type: "alerts"
+      series: "kinesis-consumer.alerts.test-alerts"
+      dimensions: [ ]
+      value_field: "kinesis-test-alerts" 
+      stat_type: "counter"
