@@ -7,5 +7,5 @@ Owned by eng-infra
 ## Deploying
 
 ```
-ark start kinesis-alerts-consumer -e production
+ark start kinesis-alerts-consumer-us-west-2 -e production
 ```
