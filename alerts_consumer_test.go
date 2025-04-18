@@ -231,7 +231,7 @@ func TestEncodeMessageErrorsIfValueExistsAndIsInvalidType(t *testing.T) {
 	consumer := AlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
-		"value":     "12345", //should fail, even though it's numeric its not the right type
+		"value":     "12345", // should fail, even though it's numeric its not the right type
 		"Hostname":  "my-hostname",
 		"env":       "my-env",
 		"timestamp": time.Time{},
@@ -503,7 +503,7 @@ func TestSendBatch(t *testing.T) {
 	}
 	err = consumer.SendBatch(input, "default")
 	assert.NoError(t, err)
-	assert.Equal(t, append(pts), mockDD.inputs)
+	assert.Equal(t, pts, mockDD.inputs)
 
 	err = consumer.SendBatch(input2, "default")
 	assert.NoError(t, err)
