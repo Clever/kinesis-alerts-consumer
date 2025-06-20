@@ -7,9 +7,9 @@ import (
 	"time"
 
 	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -80,9 +80,9 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 				},
 			},
 		}},
-		CWMetrics: []*cloudwatch.MetricDatum{
+		CWMetrics: []types.MetricDatum{
 			{
-				Dimensions: []*cloudwatch.Dimension{
+				Dimensions: []types.Dimension{
 					{
 						Name:  aws.String("dimension1"),
 						Value: aws.String("dim"),
@@ -91,7 +91,7 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 				MetricName:        aws.String("ContainerExitCount"),
 				Timestamp:         aws.Time(timestamp),
 				Value:             aws.Float64(1),
-				StorageResolution: aws.Int64(1),
+				StorageResolution: aws.Int32(1),
 			},
 		},
 	}
@@ -404,13 +404,13 @@ func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
 }
 
 type MockCW struct {
-	cloudwatchiface.CloudWatchAPI
+	CloudWatchAPI
 	inputs []*cloudwatch.PutMetricDataInput
 }
 
-func (cw *MockCW) PutMetricData(input *cloudwatch.PutMetricDataInput) (*cloudwatch.PutMetricDataOutput, error) {
+func (cw *MockCW) PutMetricData(ctx context.Context, input *cloudwatch.PutMetricDataInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.PutMetricDataOutput, error) {
 	cw.inputs = append(cw.inputs, input)
-	return nil, nil
+	return &cloudwatch.PutMetricDataOutput{}, nil
 }
 
 type MockDD struct {
@@ -493,7 +493,7 @@ func TestSendBatch(t *testing.T) {
 	input2 := [][]byte{b2}
 
 	mockCWUSWest1 := &MockCW{}
-	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+	mockCWs := map[string]CloudWatchAPI{
 		"us-west-1": mockCWUSWest1,
 	}
 	mockDD := &MockDD{}
@@ -511,9 +511,9 @@ func TestSendBatch(t *testing.T) {
 }
 
 func TestSendBatchToCloudwatch(t *testing.T) {
-	dats := []*cloudwatch.MetricDatum{
+	dats := []types.MetricDatum{
 		{
-			Dimensions: []*cloudwatch.Dimension{
+			Dimensions: []types.Dimension{
 				{
 					Name:  aws.String("Hostname"),
 					Value: aws.String("my-hostname"),
@@ -527,7 +527,7 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 			Value:      aws.Float64(1),
 		},
 		{
-			Dimensions: []*cloudwatch.Dimension{
+			Dimensions: []types.Dimension{
 				{
 					Name:  aws.String("Hostname"),
 					Value: aws.String("my-hostname"),
@@ -545,9 +545,9 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	expected := []*cloudwatch.PutMetricDataInput{
 		{
 			Namespace: aws.String("LogMetrics"),
-			MetricData: []*cloudwatch.MetricDatum{
+			MetricData: []types.MetricDatum{
 				{
-					Dimensions: []*cloudwatch.Dimension{
+					Dimensions: []types.Dimension{
 						{
 							Name:  aws.String("Hostname"),
 							Value: aws.String("my-hostname"),
@@ -561,7 +561,7 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 					Value:      aws.Float64(1),
 				},
 				{
-					Dimensions: []*cloudwatch.Dimension{
+					Dimensions: []types.Dimension{
 						{
 							Name:  aws.String("Hostname"),
 							Value: aws.String("my-hostname"),
@@ -585,7 +585,7 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	input := [][]byte{b}
 
 	mockCWUSWest1 := &MockCW{}
-	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+	mockCWs := map[string]CloudWatchAPI{
 		"us-west-1": mockCWUSWest1,
 	}
 	mockDD := &MockDD{}
@@ -669,7 +669,7 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 	input := [][]byte{b, b2}
 
 	mockCWUSWest1 := MockCW{}
-	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+	mockCWs := map[string]CloudWatchAPI{
 		"us-west-1": &mockCWUSWest1,
 	}
 	mockDD := &MockDD{}

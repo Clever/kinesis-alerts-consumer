@@ -7,15 +7,15 @@ import (
 	"time"
 
 	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/eapache/go-resiliency/retrier"
 	"golang.org/x/net/context"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
 	"github.com/Clever/amazon-kinesis-client-go/decode"
 	"github.com/Clever/kayvee-go/v7/logger"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
 
 var (
@@ -30,7 +30,7 @@ const cloudwatchNamespace = "LogMetrics"
 type AlertsConsumer struct {
 	dd        DDMetricsAPI
 	deployEnv string
-	cwAPIs    map[string]cloudwatchiface.CloudWatchAPI
+	cwAPIs    map[string]CloudWatchAPI
 }
 
 // DDMetricsAPI is the subset of the Datadog Metrics API that we use
@@ -38,7 +38,11 @@ type DDMetricsAPI interface {
 	SubmitMetrics(ctx context.Context, body datadog.MetricPayload, o ...datadog.SubmitMetricsOptionalParameters) (datadog.IntakePayloadAccepted, *http.Response, error)
 }
 
-func NewAlertsConsumer(dd DDMetricsAPI, deployEnv string, cwAPIs map[string]cloudwatchiface.CloudWatchAPI) *AlertsConsumer {
+type CloudWatchAPI interface {
+	PutMetricData(ctx context.Context, params *cloudwatch.PutMetricDataInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.PutMetricDataOutput, error)
+}
+
+func NewAlertsConsumer(dd DDMetricsAPI, deployEnv string, cwAPIs map[string]CloudWatchAPI) *AlertsConsumer {
 	return &AlertsConsumer{
 		dd:        dd,
 		deployEnv: deployEnv,
@@ -64,7 +68,7 @@ func (c *AlertsConsumer) ProcessMessage(rawmsg []byte) (msg []byte, tags []strin
 
 type EncodeOutput struct {
 	DDMetrics []datadog.MetricSeries
-	CWMetrics []*cloudwatch.MetricDatum
+	CWMetrics []types.MetricDatum
 }
 
 // returns true if s is in the slice
@@ -116,7 +120,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 	// Create batch item from message
 	eo := EncodeOutput{
 		DDMetrics: []datadog.MetricSeries{},
-		CWMetrics: []*cloudwatch.MetricDatum{},
+		CWMetrics: []types.MetricDatum{},
 	}
 
 	// This is set to an AWS region if any of the routes are for metrics that are whitelisted for CloudWatch.
@@ -126,7 +130,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 	for _, route := range routes {
 		// Look up dimensions (custom + default)
 		tags := []string{}
-		cwDims := []*cloudwatch.Dimension{}
+		cwDims := []types.Dimension{}
 		for _, dim := range route.Dimensions {
 			if dimVal, ok := fields[dim]; ok {
 				var val string
@@ -146,9 +150,9 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 				}
 				tags = append(tags, dim+":"+val)
 				if !contains(defaultDimensions, dim) {
-					cwDims = append(cwDims, &cloudwatch.Dimension{
+					cwDims = append(cwDims, types.Dimension{
 						Name:  aws.String(dim),
-						Value: &val,
+						Value: aws.String(val),
 					})
 				}
 			}
@@ -204,12 +208,12 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 		})
 
 		if _, ok := cloudwatchAllowList[route.Series]; ok {
-			dat := &cloudwatch.MetricDatum{
-				MetricName:        &route.Series,
+			dat := types.MetricDatum{
+				MetricName:        aws.String(route.Series),
 				Dimensions:        cwDims,
 				Value:             aws.Float64(metricValue),
-				Timestamp:         &timestamp,
-				StorageResolution: aws.Int64(1),
+				Timestamp:         aws.Time(timestamp),
+				StorageResolution: aws.Int32(1),
 			}
 			if region, ok := fields["region"].(string); ok {
 				tag = region
@@ -235,7 +239,7 @@ func (c *AlertsConsumer) encodeMessage(fields map[string]interface{}, numBytes i
 // The tags should always be either "default" or an AWS region (e.g. "us-west-1")
 func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	metrics := []datadog.MetricSeries{}
-	dats := []*cloudwatch.MetricDatum{}
+	dats := []types.MetricDatum{}
 	for _, b := range batch {
 		eo := EncodeOutput{}
 		err := json.Unmarshal(b, &eo)
@@ -271,7 +275,7 @@ func (c *AlertsConsumer) SendBatch(batch [][]byte, tag string) error {
 	// only send to Cloudwatch if the tag is an AWS region
 	if api, ok := c.cwAPIs[tag]; ok {
 		lg.TraceD("cloudwatch-add-datapoints", logger.M{"point-count": len(dats)})
-		_, err = api.PutMetricData(&cloudwatch.PutMetricDataInput{
+		_, err = api.PutMetricData(context.Background(), &cloudwatch.PutMetricDataInput{
 			Namespace:  aws.String(cloudwatchNamespace),
 			MetricData: dats,
 		})

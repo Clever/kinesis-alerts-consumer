@@ -1,21 +1,19 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"path"
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
-
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
 	"github.com/Clever/kayvee-go/v7/logger"
 	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/kardianos/osext"
 )
 
@@ -51,18 +49,33 @@ func setupLogRouting() {
 func main() {
 	setupLogRouting()
 
-	config := kbc.Config{
+	consumerConfig := kbc.Config{
 		FailedLogsFile: "/tmp/kinesis-consumer-" + time.Now().Format(time.RFC3339),
 		BatchCount:     100,
 		BatchInterval:  time.Second * 5,
 		ReadRateLimit:  getIntEnv("READ_RATE_LIMIT"),
 	}
 
-	cwAPIs := map[string]cloudwatchiface.CloudWatchAPI{
-		"us-west-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-1")})),
-		"us-west-2": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-2")})),
-		"us-east-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-east-1")})),
-		"us-east-2": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-east-2")})),
+	// Initialize AWS SDK v2 config
+	ctx := context.Background()
+	awsConfig, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatal("unable to load SDK config: ", err)
+	}
+
+	cwAPIs := map[string]CloudWatchAPI{
+		"us-west-1": cloudwatch.NewFromConfig(awsConfig, func(o *cloudwatch.Options) {
+			o.Region = "us-west-1"
+		}),
+		"us-west-2": cloudwatch.NewFromConfig(awsConfig, func(o *cloudwatch.Options) {
+			o.Region = "us-west-2"
+		}),
+		"us-east-1": cloudwatch.NewFromConfig(awsConfig, func(o *cloudwatch.Options) {
+			o.Region = "us-east-1"
+		}),
+		"us-east-2": cloudwatch.NewFromConfig(awsConfig, func(o *cloudwatch.Options) {
+			o.Region = "us-east-2"
+		}),
 	}
 
 	ddAPIClient := datadog.NewAPIClient(datadog.NewConfiguration())
@@ -82,6 +95,6 @@ func main() {
 		processMetrics(ddAPIClient.MetricsApi, tic)
 	}()
 
-	consumer := kbc.NewBatchConsumer(config, ac)
+	consumer := kbc.NewBatchConsumer(consumerConfig, ac)
 	consumer.Start()
 }
