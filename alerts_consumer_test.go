@@ -1,22 +1,38 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
 
 	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
-	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/net/context"
 )
 
+// Add this interface for mocking
+// This matches the v2 SDK's PutMetricData signature
+// Both *cloudwatch.Client and MockCW will implement this
+
+type CloudWatchPutMetricDataAPI interface {
+	PutMetricData(ctx context.Context, params *cloudwatch.PutMetricDataInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.PutMetricDataOutput, error)
+}
+
+// TestAlertsConsumer overrides the cwAPIs field for testing
+type TestAlertsConsumer struct {
+	AlertsConsumer
+	cwAPIs map[string]CloudWatchPutMetricDataAPI
+}
+
 func TestProcessMessage(t *testing.T) {
-	consumer := AlertsConsumer{
-		deployEnv: "test-env",
+	consumer := TestAlertsConsumer{
+		AlertsConsumer: AlertsConsumer{
+			deployEnv: "test-env",
+		},
 	}
 	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"level":"info","source":"oauth","title":"login_start","action":"login","type":"counter","session_id":"sss","auth_method":"auth","district":"ddd","client_id":"ccc","app_id":"aaa","request_id":"","_kvmeta":{"team":"eng-team","kv_version":"3.8.2","kv_language":"js","routes":[{"type":"analytics","series":"series-name","rule":"login-events"},{"type":"alerts","series":"oauth.login_start","dimensions":["district","title","auth_method"],"stat_type":"counter","value_field":"value","rule":"login-start"}]}}`
 	msg, tags, err := consumer.ProcessMessage([]byte(rawmsg))
@@ -52,8 +68,10 @@ func TestProcessMessage(t *testing.T) {
 }
 
 func TestProcessMessageSupportsCloudwatch(t *testing.T) {
-	consumer := AlertsConsumer{
-		deployEnv: "test-env",
+	consumer := TestAlertsConsumer{
+		AlertsConsumer: AlertsConsumer{
+			deployEnv: "test-env",
+		},
 	}
 	rawmsg := `2017-08-15T18:39:07.000000+00:00 my-hostname production--my-app/arn%3Aaws%3Aecs%3Aus-west-1%3A589690932525%3Atask%2Fbe5eafc1-8e44-489a-8942-aaaaaaaaaaaa[3337]: {"_kvmeta":{"kv_language":"go","kv_version":"6.16.0","routes":[{"dimensions":["dimension1"],"rule":"unexpected-stop","series":"ContainerExitCount","stat_type":"counter","type":"alerts","value_field":"value"}],"team":"eng-infra"},"category":"app_lifecycle","level":"info","title":"title","dimension1":"dim","region":"reg","type":"counter","value":1}`
 	msg, tags, err := consumer.ProcessMessage([]byte(rawmsg))
@@ -80,9 +98,9 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 				},
 			},
 		}},
-		CWMetrics: []*cloudwatch.MetricDatum{
+		CWMetrics: []types.MetricDatum{
 			{
-				Dimensions: []*cloudwatch.Dimension{
+				Dimensions: []types.Dimension{
 					{
 						Name:  aws.String("dimension1"),
 						Value: aws.String("dim"),
@@ -91,7 +109,7 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 				MetricName:        aws.String("ContainerExitCount"),
 				Timestamp:         aws.Time(timestamp),
 				Value:             aws.Float64(1),
-				StorageResolution: aws.Int64(1),
+				StorageResolution: aws.Int32(1),
 			},
 		},
 	}
@@ -101,7 +119,7 @@ func TestProcessMessageSupportsCloudwatch(t *testing.T) {
 
 // TestEncodeMessage tests the encodeMessage() helper used in ProcessMessage()
 func TestEncodeMessage(t *testing.T) {
-	consumer := AlertsConsumer{}
+	consumer := TestAlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
 		"value":     float64(123),
@@ -147,7 +165,7 @@ func TestEncodeMessage(t *testing.T) {
 }
 
 func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
-	consumer := AlertsConsumer{}
+	consumer := TestAlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
 		"value":     float64(123),
@@ -200,7 +218,7 @@ func TestEncodeMessageWithNonStringDimensions(t *testing.T) {
 }
 
 func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
-	consumer := AlertsConsumer{}
+	consumer := TestAlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
 		"value":     float64(123),
@@ -228,7 +246,7 @@ func TestEncodeMessageErrorsIfInvalidDimensionType(t *testing.T) {
 }
 
 func TestEncodeMessageErrorsIfValueExistsAndIsInvalidType(t *testing.T) {
-	consumer := AlertsConsumer{}
+	consumer := TestAlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
 		"value":     "12345", // should fail, even though it's numeric its not the right type
@@ -255,7 +273,7 @@ func TestEncodeMessageErrorsIfValueExistsAndIsInvalidType(t *testing.T) {
 }
 
 func TestEncodeMessageWithGauge(t *testing.T) {
-	consumer := AlertsConsumer{}
+	consumer := TestAlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
 		"value":     float64(9.5),
@@ -304,7 +322,7 @@ func TestEncodeMessageWithGauge(t *testing.T) {
 }
 
 func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
-	consumer := AlertsConsumer{}
+	consumer := TestAlertsConsumer{}
 	input := map[string]interface{}{
 		"rawlog":    "...",
 		"value":     float64(9.5),
@@ -381,7 +399,7 @@ func TestEncodeMessageWithMultipleRoutes(t *testing.T) {
 
 func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
 	t.Log("If message has no Alerts routes, it will write 0 datapoints")
-	consumer := AlertsConsumer{}
+	consumer := TestAlertsConsumer{}
 
 	// Not an alert
 	input := map[string]interface{}{
@@ -404,13 +422,12 @@ func TestEncodeMessageWithNoAlertsRoutes(t *testing.T) {
 }
 
 type MockCW struct {
-	cloudwatchiface.CloudWatchAPI
 	inputs []*cloudwatch.PutMetricDataInput
 }
 
-func (cw *MockCW) PutMetricData(input *cloudwatch.PutMetricDataInput) (*cloudwatch.PutMetricDataOutput, error) {
+func (cw *MockCW) PutMetricData(ctx context.Context, input *cloudwatch.PutMetricDataInput, optFns ...func(*cloudwatch.Options)) (*cloudwatch.PutMetricDataOutput, error) {
 	cw.inputs = append(cw.inputs, input)
-	return nil, nil
+	return &cloudwatch.PutMetricDataOutput{}, nil
 }
 
 type MockDD struct {
@@ -493,13 +510,15 @@ func TestSendBatch(t *testing.T) {
 	input2 := [][]byte{b2}
 
 	mockCWUSWest1 := &MockCW{}
-	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+	mockCWs := map[string]CloudWatchPutMetricDataAPI{
 		"us-west-1": mockCWUSWest1,
 	}
 	mockDD := &MockDD{}
-	consumer := AlertsConsumer{
+	consumer := TestAlertsConsumer{
+		AlertsConsumer: AlertsConsumer{
+			dd: mockDD,
+		},
 		cwAPIs: mockCWs,
-		dd:     mockDD,
 	}
 	err = consumer.SendBatch(input, "default")
 	assert.NoError(t, err)
@@ -511,9 +530,9 @@ func TestSendBatch(t *testing.T) {
 }
 
 func TestSendBatchToCloudwatch(t *testing.T) {
-	dats := []*cloudwatch.MetricDatum{
+	dats := []types.MetricDatum{
 		{
-			Dimensions: []*cloudwatch.Dimension{
+			Dimensions: []types.Dimension{
 				{
 					Name:  aws.String("Hostname"),
 					Value: aws.String("my-hostname"),
@@ -523,11 +542,11 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 					Value: aws.String("test-env"),
 				},
 			},
-			MetricName: aws.String("series-1"),
+			MetricName: aws.String("ContainerExitCount"),
 			Value:      aws.Float64(1),
 		},
 		{
-			Dimensions: []*cloudwatch.Dimension{
+			Dimensions: []types.Dimension{
 				{
 					Name:  aws.String("Hostname"),
 					Value: aws.String("my-hostname"),
@@ -537,7 +556,7 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 					Value: aws.String("test-env"),
 				},
 			},
-			MetricName: aws.String("series-2"),
+			MetricName: aws.String("ContainerExitCount"),
 			Value:      aws.Float64(1),
 		},
 	}
@@ -545,9 +564,9 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	expected := []*cloudwatch.PutMetricDataInput{
 		{
 			Namespace: aws.String("LogMetrics"),
-			MetricData: []*cloudwatch.MetricDatum{
+			MetricData: []types.MetricDatum{
 				{
-					Dimensions: []*cloudwatch.Dimension{
+					Dimensions: []types.Dimension{
 						{
 							Name:  aws.String("Hostname"),
 							Value: aws.String("my-hostname"),
@@ -557,11 +576,11 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 							Value: aws.String("test-env"),
 						},
 					},
-					MetricName: aws.String("series-1"),
+					MetricName: aws.String("ContainerExitCount"),
 					Value:      aws.Float64(1),
 				},
 				{
-					Dimensions: []*cloudwatch.Dimension{
+					Dimensions: []types.Dimension{
 						{
 							Name:  aws.String("Hostname"),
 							Value: aws.String("my-hostname"),
@@ -571,7 +590,7 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 							Value: aws.String("test-env"),
 						},
 					},
-					MetricName: aws.String("series-2"),
+					MetricName: aws.String("ContainerExitCount"),
 					Value:      aws.Float64(1),
 				},
 			},
@@ -585,13 +604,15 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	input := [][]byte{b}
 
 	mockCWUSWest1 := &MockCW{}
-	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+	mockCWs := map[string]CloudWatchPutMetricDataAPI{
 		"us-west-1": mockCWUSWest1,
 	}
 	mockDD := &MockDD{}
-	consumer := AlertsConsumer{
+	consumer := TestAlertsConsumer{
+		AlertsConsumer: AlertsConsumer{
+			dd: mockDD,
+		},
 		cwAPIs: mockCWs,
-		dd:     mockDD,
 	}
 	t.Log("Send batch")
 	err = consumer.SendBatch(input, "us-west-1")
@@ -669,13 +690,15 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 	input := [][]byte{b, b2}
 
 	mockCWUSWest1 := MockCW{}
-	mockCWs := map[string]cloudwatchiface.CloudWatchAPI{
+	mockCWs := map[string]CloudWatchPutMetricDataAPI{
 		"us-west-1": &mockCWUSWest1,
 	}
 	mockDD := &MockDD{}
-	consumer := AlertsConsumer{
+	consumer := TestAlertsConsumer{
+		AlertsConsumer: AlertsConsumer{
+			dd: mockDD,
+		},
 		cwAPIs: mockCWs,
-		dd:     mockDD,
 	}
 	t.Log("Send batch with multiple entries")
 	err = consumer.SendBatch(input, "default")

@@ -1,21 +1,19 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"path"
 	"strconv"
 	"time"
 
-	"github.com/aws/aws-sdk-go/service/cloudwatch/cloudwatchiface"
-
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 
 	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
 	"github.com/Clever/kayvee-go/v7/logger"
 	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/kardianos/osext"
 )
 
@@ -58,11 +56,18 @@ func main() {
 		ReadRateLimit:  getIntEnv("READ_RATE_LIMIT"),
 	}
 
-	cwAPIs := map[string]cloudwatchiface.CloudWatchAPI{
-		"us-west-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-1")})),
-		"us-west-2": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-west-2")})),
-		"us-east-1": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-east-1")})),
-		"us-east-2": cloudwatch.New(session.New(&aws.Config{Region: aws.String("us-east-2")})),
+	// Create AWS config for each region
+	ctx := context.Background()
+	cwAPIs := make(map[string]*cloudwatch.Client)
+
+	regions := []string{"us-west-1", "us-west-2", "us-east-1", "us-east-2"}
+	for _, region := range regions {
+		cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
+		if err != nil {
+			log.Printf("Failed to load AWS config for region %s: %v", region, err)
+			continue
+		}
+		cwAPIs[region] = cloudwatch.NewFromConfig(cfg)
 	}
 
 	ddAPIClient := datadog.NewAPIClient(datadog.NewConfiguration())

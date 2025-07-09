@@ -1,14 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"time"
 
 	"github.com/DataDog/datadog-api-client-go/api/v2/datadog"
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/eapache/go-resiliency/retrier"
-	"golang.org/x/net/context"
 
 	"github.com/Clever/kayvee-go/v7/logger"
 )
