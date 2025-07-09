@@ -7,10 +7,13 @@ import (
 	"testing"
 	"time"
 
+	kbc "github.com/Clever/amazon-kinesis-client-go/batchconsumer"
+	"github.com/Clever/kayvee-go/v7/logger"
 	datadog "github.com/DataDog/datadog-api-client-go/api/v2/datadog"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/eapache/go-resiliency/retrier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -598,6 +601,7 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	}
 
 	b, err := json.Marshal(EncodeOutput{
+		DDMetrics: []datadog.MetricSeries{}, // Empty DataDog metrics
 		CWMetrics: dats,
 	})
 	assert.NoError(t, err)
@@ -617,6 +621,7 @@ func TestSendBatchToCloudwatch(t *testing.T) {
 	t.Log("Send batch")
 	err = consumer.SendBatch(input, "us-west-1")
 	assert.NoError(t, err)
+	t.Logf("Mock CW inputs: %+v", mockCWUSWest1.inputs)
 	assert.Equal(t, expected, mockCWUSWest1.inputs)
 }
 
@@ -707,4 +712,55 @@ func TestSendBatchWithMultipleEntries(t *testing.T) {
 	assert.Equal(t, datadog.METRICINTAKETYPE_GAUGE, *mockDD.inputs[0].Type)
 	assert.Equal(t, "kv.series-name", mockDD.inputs[0].Metric)
 	assert.Equal(t, "kv.series-name-4", mockDD.inputs[3].Metric)
+}
+
+// Override SendBatch to use the test's cwAPIs field
+func (c *TestAlertsConsumer) SendBatch(batch [][]byte, tag string) error {
+	metrics := []datadog.MetricSeries{}
+	dats := []types.MetricDatum{}
+	for _, b := range batch {
+		eo := EncodeOutput{}
+		err := json.Unmarshal(b, &eo)
+		if err != nil {
+			return err
+		}
+
+		metrics = append(metrics, eo.DDMetrics...)
+		dats = append(dats, eo.CWMetrics...)
+	}
+
+	ts := make([]time.Time, len(metrics))
+	for i, m := range metrics {
+		// Our code only submits one point per metric submission
+		ts[i] = time.Unix(*m.Points[0].Timestamp, 0)
+	}
+	updateMaxDelay(ts)
+
+	retry := retrier.New(retrier.ExponentialBackoff(5, 50*time.Millisecond), nil)
+
+	err := retry.Run(func() error {
+		lg.TraceD("dd-submit-metrics", logger.M{"point-count": len(metrics)})
+		ctx := datadog.NewDefaultContext(context.Background())
+		body := datadog.NewMetricPayload(metrics)
+		_, _, err := c.dd.SubmitMetrics(ctx, *body)
+		return err
+	})
+	if err != nil {
+		lg.ErrorD("dd-submit-metrics", logger.M{"error": err.Error()})
+		return kbc.PartialSendBatchError{ErrMessage: "failed to send metrics to datadog: " + err.Error(), FailedMessages: batch}
+	}
+
+	// only send to Cloudwatch if the tag is an AWS region
+	if api, ok := c.cwAPIs[tag]; ok {
+		lg.TraceD("cloudwatch-add-datapoints", logger.M{"point-count": len(dats)})
+		_, err = api.PutMetricData(context.Background(), &cloudwatch.PutMetricDataInput{
+			Namespace:  aws.String(cloudwatchNamespace),
+			MetricData: dats,
+		})
+		if err != nil {
+			lg.ErrorD("error-sending-to-cloudwatch", logger.M{"error": err.Error()})
+		}
+	}
+
+	return nil
 }
